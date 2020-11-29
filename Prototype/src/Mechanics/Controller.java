@@ -1,6 +1,5 @@
 package Mechanics;
 
-import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.util.LinkedList;
@@ -34,29 +33,29 @@ public class Controller {
 			
 		tempBullet = ll.get(i);
 		tempPoint = hitBox.get(i);	
-		tempPoint.move(tempBullet.x, tempBullet.y);
+		tempPoint.move(tempBullet.getX(), tempBullet.getY());
 		tempBullet.tick();
 		
 		
-		if (tempBullet.y<=0)
+		if (tempBullet.getY()<=0)
 		{
 			
 			removeBullet(tempBullet);
 			hitBox.remove(i);
 		}
-		else if (tempBullet.x<=0)
+		else if (tempBullet.getX()<=0)
 		{
 			
 			removeBullet(tempBullet);
 			hitBox.remove(i);
 		}
-		else if (tempBullet.x>=800)
+		else if (tempBullet.getX()>=800)
 		{
 			
 			removeBullet(tempBullet);
 			hitBox.remove(i);
 		}
-		else if (tempBullet.y>= 600)
+		else if (tempBullet.getY()>= 600)
 		{
 			
 			removeBullet(tempBullet);

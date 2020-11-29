@@ -11,63 +11,62 @@ public class Zombie {
 	int x = r.nextInt(800);
 	int y = r.nextInt(200);
 	int width = 50;
-	int height= 50;
+	int height = 50;
 	public Rectangle zombie;
 	public boolean alive = true;
 	public int Health = 100;
-	public Zombie()
-	{
-		
-		zombie = new Rectangle(x,y, width, height);
-		
-	}
-	public void drawZombie(Graphics g)
-	{
-		if (alive)
-		{
-		g.setColor(Color.gray);
-		g.fillRect(zombie.x, zombie.y,zombie.width, zombie.height);
-		}
-		}
+
+	int xCenter = x + 25;
+	int yCenter = y + 25;
 	
-	public void chase(Player player)
-	{
-		
-		if (player.x > zombie.x)
-		{
-			zombie.x+=1;
-			
-		}
-		 if (player.y>zombie.y)
-		{
-			zombie.y+=1;
-			
-		}
-		 if (player.x<zombie.x)
-		{
-			
-			zombie.x-= 1;
-		}
-		 if (player.y<zombie.y)
-		{
-			
-			zombie.y-=1;
-			
+	
+	public Zombie() {
+
+		zombie = new Rectangle(x, y, width, height);
+
+	}
+
+	public void drawZombie(Graphics g) {
+		if (alive) {
+			g.setColor(Color.gray);
+			g.fillRect(zombie.x, zombie.y, zombie.width, zombie.height);
 		}
 	}
-	
-	public void setX(int value)
-	{
+
+	public void chase(Player player) {
+
+		if (player.x > zombie.x) {
+			zombie.x += 1;
+			xCenter += 1;
+
+		}
+		if (player.y > zombie.y) {
+			zombie.y += 1;
+			yCenter += 1;
+		}
+		if (player.x < zombie.x) {
+
+			zombie.x -= 1;
+			xCenter -= 1;
+		}
+		if (player.y < zombie.y) {
+
+			zombie.y -= 1;
+			yCenter -= 1;
+		}
+
+		
+	}
+
+	public void setX(int value) {
 		x = value;
-		
+
 	}
-	
-	public void setY (int value)
-	{
-		
-		
+
+	public void setY(int value) {
+
 		y = value;
-		
+
 	}
-	
+
 }
