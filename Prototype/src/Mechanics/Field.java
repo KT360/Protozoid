@@ -16,6 +16,10 @@ import javax.swing.Timer;
 
 public class Field extends JPanel implements ActionListener, KeyListener{
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -5932129097751782616L;
 	Timer t = new Timer(5, this);
 	Player player = new Player();
 	//Zombie Zombie = new Zombie();
@@ -51,7 +55,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 	public void initZombies()
 	{
 		
-		swarm = new Zombie[100];
+		swarm = new Zombie[1];
 		for (int i=0; i<swarm.length; i++)
 		{
 			swarm[i] = new Zombie();
@@ -87,10 +91,13 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			swarm[i].drawZombie(g);
 		}
 		
+		
+		
 	}
 	Point tempPoint;
 	@Override
 	public void actionPerformed(ActionEvent e) {
+
 		repaint();
 		player.move();
 		controller.moveBullet();
@@ -130,6 +137,17 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 //			
 //		}
 		}
+		
+		
+		//after the zombies move or whatever
+		//check for collision
+		//feel free to move the function elsewhere
+		
+		checkForColision();
+		
+		
+		
+		
 	}
 	@Override
 	public void keyTyped(KeyEvent e) {
@@ -211,4 +229,26 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		
 	}
 
+	//this is a toy collision detection system!!
+	//shall a player surpass a zombie within one frame
+	//this will not catch the error,although with the specified speed
+	//no such problem will arise
+	//also this aproximates the square as a circle
+	//being a little forgiving over the edges
+	//but is more forgiving to the eye implementing this with pythagoreum theorem
+	//rather than another algorithm
+	
+	void checkForColision(){
+		
+		for(Zombie z : swarm) {
+			double distance = Math.sqrt (Math.pow((double) player.xCenter - z.xCenter ,2) +  Math.pow((double) player.yCenter - z.yCenter ,2)  ); //pythagoreum theorem for distance between two points
+			double totalRadius = ((double) player.width) / 2 + ((double) z.width) / 2;
+			
+			if(distance < totalRadius) {
+				/*
+				 * Collision resolution goes here
+				 */
+			}
+		}
+	}
 }
