@@ -8,12 +8,23 @@ import java.util.Random;
 public class Zombie {
 
 	Random r = new Random();
+	
 	int x = r.nextInt(800);
 	int y = r.nextInt(200);
+	
 	int width = 50;
 	int height = 50;
+	
+	//Added directions
+	int xDir;
+	int yDir;
+	
 	public Rectangle zombie;
+	
 	public boolean alive = true;
+	
+	boolean shouldChase = true;
+	
 	public int Health = 100;
 
 	int xCenter = x + 25;
@@ -36,28 +47,48 @@ public class Zombie {
 	public void chase(Player player) {
 
 		if (player.x > zombie.x) {
-			zombie.x += 1;
-			xCenter += 1;
+			
+			xDir =1;
+			
+			zombie.x += xDir;
+			
+			xCenter += xDir;
 
 		}
 		if (player.y > zombie.y) {
-			zombie.y += 1;
-			yCenter += 1;
+			
+			yDir = 1;
+			
+			zombie.y += yDir;
+			
+			yCenter += yDir;
 		}
-		if (player.x < zombie.x) {
-
-			zombie.x -= 1;
-			xCenter -= 1;
+		if (player.x < zombie.x ) {
+			
+			xDir = -1;
+			
+			zombie.x += xDir;
+			
+			xCenter += xDir;
 		}
-		if (player.y < zombie.y) {
-
-			zombie.y -= 1;
-			yCenter -= 1;
+		if (player.y < zombie.y ) {
+			
+			yDir = -1;
+			
+			zombie.y += yDir;
+			
+			yCenter += yDir;
 		}
 
 		
 	}
 
+	public void attack ()
+	{
+		
+		xDir = 0;
+		yDir = 0;
+	}
 	public void setX(int value) {
 		x = value;
 

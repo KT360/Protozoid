@@ -9,6 +9,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 import java.util.Random;
 
 import javax.swing.JPanel;
@@ -22,10 +23,13 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 	private static final long serialVersionUID = -5932129097751782616L;
 	Timer t = new Timer(5, this);
 	Player player = new Player();
-	//Zombie Zombie = new Zombie();
+	
 	Controller controller = new Controller();
-	Zombie[] swarm;
+	
+	//Made the swarm into an array List so that they stop existing when their dead :)
+	ArrayList<Zombie> swarm;
 
+	int zombiesNumb = 4;
 
 	int bulletxPos;
 	int bulletyPos;
@@ -40,7 +44,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		setFocusable(true);
 		addKeyListener(this);
 		initZombies();
-		//initZombiesPos();
+		
 		
 	}
 	public void paintComponent(Graphics g)
@@ -48,52 +52,36 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		super.paintComponent(g);
 		Graphics2D g2d = (Graphics2D) g;
 		player.drawPlayer(g2d);
-		//Zombie.drawZombie(g2d);
+		
 		controller.renderBullet(g2d);
 		drawZombies(g2d);
 	}
 	public void initZombies()
 	{
 		
-		swarm = new Zombie[1];
-		for (int i=0; i<swarm.length; i++)
+		//new Array
+		swarm = new ArrayList<Zombie>();
+		
+		for(int i =0; i<zombiesNumb; i++)
 		{
-			swarm[i] = new Zombie();
-
+		swarm.add(new Zombie());
 		}
 		
 		
-		
 	}
-	
-	public void initZombiesPos() {
-		
-		Random r = new Random();
-			
-		
-			
-		for (int i=0; i<swarm.length; i++)
-		{
-			
-			swarm[i].setX (r.nextInt(800));
-			swarm[i].setY(r.nextInt(300));
 
-		}
-	}
-	
 	public void drawZombies(Graphics2D g)
 	{
-		
-		for (int i =0; i<swarm.length; i++)
+
+		//Looks prettier with a for each loop
+		for(Zombie z : swarm)
 		{
+			z.drawZombie(g);
 			
-			
-			swarm[i].drawZombie(g);
 		}
 		
-		
-		
 	}
+	
 	Point tempPoint;
 	@Override
 	public void actionPerformed(ActionEvent e) {
@@ -101,49 +89,56 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		repaint();
 		player.move();
 		controller.moveBullet();
-		//Zombie.chase(player);
 		
-		for (int i= 0; i<swarm.length; i++)
-		{
-			
-			swarm[i].chase(player);
-			
-		}
 		
-		for (int i =0 ; i< swarm.length; i++)
-		{
-		for (int j =0; j<controller.hitBox.size(); j++)
-		{
-			tempPoint = controller.hitBox.get(j);
-		
-		if (swarm[i].zombie.contains(tempPoint))
+		//here as well
+		for(Zombie z : swarm)
 		{
 			
-			
-			swarm[i].Health -= 5;
-			
-			if (swarm[i].Health <=0)
+			if(z.shouldChase)
 			{
-			swarm[i].alive = false;
+				z.chase(player);
+				
+			}
+			else
+			{
+				z.attack();
+				
 			}
 		}
-		
-		
-		}
-//		else 
-//		{
-//			
-//			Zombie.alive = true;
-//			
-//		}
-		}
-		
-		
-		//after the zombies move or whatever
-		//check for collision
-		//feel free to move the function elsewhere
+
 		
 		checkForColision();
+		
+		for (int i =0 ; i< swarm.size(); i++)
+		{
+			for (int j =0; j<controller.hitBox.size(); j++)
+			{
+				tempPoint = controller.hitBox.get(j);
+			
+				if (swarm.get(i).zombie.contains(tempPoint))
+				{
+					
+					
+					swarm.get(i).Health -= 5;
+					
+					if (swarm.get(i).Health <=0)
+					{
+					swarm.get(i).alive = false;
+					
+					//remove zombie from map
+					swarm.remove(i);
+					
+					}
+				}
+			
+			
+			}
+
+		}
+		
+		
+		
 		
 		
 		
@@ -191,6 +186,13 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			bulletyVel = 0;
 			
 		}
+		else if (e.getKeyCode() == KeyEvent.VK_C)
+		{
+			
+			controller.addBullet(new Bullet(player.x, player.y, bulletxVel, bulletyVel));
+			
+			
+		}
 	}
 	@Override
 	public void keyReleased(KeyEvent e) {
@@ -219,35 +221,40 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			player.xDir =0;
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_C)
-		{
-			
-			controller.addBullet(new Bullet(player.x, player.y, bulletxVel, bulletyVel));
-			
-			
-		}
+		
 		
 	}
 
-	//this is a toy collision detection system!!
-	//shall a player surpass a zombie within one frame
-	//this will not catch the error,although with the specified speed
-	//no such problem will arise
-	//also this aproximates the square as a circle
-	//being a little forgiving over the edges
-	//but is more forgiving to the eye implementing this with pythagoreum theorem
-	//rather than another algorithm
+	
 	
 	void checkForColision(){
 		
 		for(Zombie z : swarm) {
-			double distance = Math.sqrt (Math.pow((double) player.xCenter - z.xCenter ,2) +  Math.pow((double) player.yCenter - z.yCenter ,2)  ); //pythagoreum theorem for distance between two points
+			double distance = Math.sqrt (Math.pow((double) player.xCenter - z.xCenter ,2) +  Math.pow((double) player.yCenter -        			z.yCenter ,2)  ); //pythagoreum theorem for distance between two points
+			
 			double totalRadius = ((double) player.width) / 2 + ((double) z.width) / 2;
+			
+			
+			//When they collide both they player and the zombies should stop moving
 			
 			if(distance < totalRadius) {
 				/*
 				 * Collision resolution goes here
 				 */
+				
+				
+				z.shouldChase =false;
+				
+				player.xDir =0;
+				player.yDir = 0;
+				
+				System.out.println("Collision!");
+				
+			}
+			else
+			{
+				
+				z.shouldChase = true;
 			}
 		}
 	}
