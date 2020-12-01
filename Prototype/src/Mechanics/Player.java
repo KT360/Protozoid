@@ -31,6 +31,8 @@ public class Player {
 			yCenter += yDir;
 		}
 	}
+	
+	
 
 
 }
