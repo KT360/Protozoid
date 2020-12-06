@@ -13,7 +13,10 @@ public class Player {
 	int yDir = 0;
 	int width = 40;
 	int height = 40;
-
+	int dashDirX =0;
+	int dashDirY=0;
+	int energy = 100;
+	
 
 	public void drawPlayer(Graphics g) {
 
@@ -21,7 +24,7 @@ public class Player {
 		g.fillRect(x, y, width, height);
 	}
 
-	public void move() {
+	public void move(int xDir, int yDir) {
 		if (x + xDir > -10 && x + xDir < 750) {
 			x += xDir;
 			xCenter += xDir;
@@ -30,6 +33,19 @@ public class Player {
 			y += yDir;
 			yCenter += yDir;
 		}
+	}
+	
+	public void dash()
+	{
+		
+		
+		for(int i =0; i<1; i++)
+		{
+			
+			move(dashDirX,dashDirY);
+			
+		}
+		
 	}
 	
 	

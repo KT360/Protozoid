@@ -83,11 +83,14 @@ public class Zombie {
 		
 	}
 
+	
 	public void attack ()
 	{
 		
 		xDir = 0;
 		yDir = 0;
+		
+		
 	}
 	public void setX(int value) {
 		x = value;
