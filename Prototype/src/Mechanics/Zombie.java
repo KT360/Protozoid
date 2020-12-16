@@ -19,11 +19,17 @@ public class Zombie {
 	int xDir;
 	int yDir;
 	
+	boolean knockedBack = false;
+	
 	public Rectangle zombie;
 	
 	public boolean alive = true;
 	
+	int knockBackForce = 3;
+	
 	boolean shouldChase = true;
+	
+	int knockBackDir;
 	
 	public int Health = 100;
 
@@ -83,6 +89,37 @@ public class Zombie {
 		
 	}
 
+	public void pullBack(int knockBackDir)
+	{
+		
+		
+		//Get the direction 
+			switch(knockBackDir)
+			{
+			case 1:
+				y -= 5;
+				yCenter -=5;
+				
+			case 2:
+				
+				x-= 5;
+				xCenter -= 5;
+				
+			case 3:
+				y += 5;
+				yCenter +=5;
+				
+			case 4:
+				
+				x+= 5;
+				xCenter +=5;
+
+			}
+
+
+	}
+	
+	
 	
 	public void attack ()
 	{

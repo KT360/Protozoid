@@ -45,9 +45,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 	int bulletyVel;
 	
 	int delay = 100;
-	
-	
-	
+
 	boolean isDashing = false;
 	
 	boolean isBeingEaten = false;
@@ -64,6 +62,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		
 		
 	}
+	
 	public void paintComponent(Graphics g)
 	{
 		super.paintComponent(g);
@@ -73,6 +72,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		controller.renderBullet(g2d);
 		drawZombies(g2d);
 	}
+	
 	public void initZombies()
 	{
 		
@@ -133,6 +133,33 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 		}
 		
 		checkForColision();
+		
+		for(Zombie z : swarm)
+		{
+			
+			if(z.knockedBack)
+			{
+				
+				if(z.knockBackForce > 0)
+				{
+					z.pullBack(z.knockBackDir);
+					
+					z.knockBackForce--;
+					
+					System.out.println(z.knockBackForce);
+					
+					if(z.knockBackForce == 0)
+					{
+						z.knockedBack = false;
+						
+						z.knockBackForce = 3;
+						
+					}
+				}
+			}
+			
+		}
+		
 		//here as well
 		for(Zombie z : swarm)
 		{
@@ -223,7 +250,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			bulletyVel = -5;
 		}
 		
-		else if (e.getKeyCode() == KeyEvent.VK_DOWN  && !isDashing)
+		if (e.getKeyCode() == KeyEvent.VK_DOWN  && !isDashing)
 		{
 			
 			player.yDir = 5;
@@ -234,7 +261,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			bulletxVel = 0;
 			bulletyVel = 5;
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_RIGHT  && !isDashing)
+		if (e.getKeyCode() == KeyEvent.VK_RIGHT  && !isDashing)
 		{
 			
 			player.xDir = 5;
@@ -245,7 +272,7 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			bulletxVel = 5;
 			bulletyVel =0;
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_LEFT  && !isDashing)
+		if (e.getKeyCode() == KeyEvent.VK_LEFT  && !isDashing)
 		{
 			
 			player.xDir =-5;
@@ -257,14 +284,14 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			bulletyVel = 0;
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_C)
+		if (e.getKeyCode() == KeyEvent.VK_C)
 		{
 			
 			controller.addBullet(new Bullet(player.xCenter, player.yCenter-5, bulletxVel, bulletyVel));
 			
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_SPACE)
+		if (e.getKeyCode() == KeyEvent.VK_SPACE)
 		{
 			isDashing = true;
 		
@@ -280,25 +307,25 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 			
 		}
 		
-		else if (e.getKeyCode() == KeyEvent.VK_DOWN)
+		if (e.getKeyCode() == KeyEvent.VK_DOWN)
 		{
 			
 			player.yDir = 0;
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_RIGHT)
+		if (e.getKeyCode() == KeyEvent.VK_RIGHT)
 		{
 			
 			player.xDir = 0;
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_LEFT)
+		if (e.getKeyCode() == KeyEvent.VK_LEFT)
 		{
 			
 			player.xDir =0;
 			
 		}
-		else if (e.getKeyCode() == KeyEvent.VK_SPACE)
+		if (e.getKeyCode() == KeyEvent.VK_SPACE)
 		{
 			isDashing = false;
 			player.energy = 100;
@@ -383,9 +410,13 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 					
 							
 								swarm.get(i).shouldChase = false;
-								swarm.get(i).zombie.y += 5;
-								swarm.get(i).yCenter += 5;
-							
+								
+									
+									swarm.get(i).zombie.y += 10;
+									swarm.get(i).yCenter += 10;
+									swarm.get(i).knockedBack = true;
+									swarm.get(i).knockBackDir = 3;
+								
 							System.out.println("blocked top");
 						}
 						//Right
@@ -393,9 +424,13 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 						{
 							 
 							 swarm.get(i).shouldChase = false;
-									swarm.get(i).zombie.x -= 5;
-									swarm.get(i).xCenter -= 5;
-								
+							 
+							    
+									swarm.get(i).zombie.x -= 10;
+									swarm.get(i).xCenter -= 10;
+									swarm.get(i).knockedBack = true;
+									swarm.get(i).knockBackDir = 4;
+									
 							System.out.println("blocked right");
 							
 						}
@@ -405,9 +440,11 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 						{
 							
 							 swarm.get(i).shouldChase = false;
-									swarm.get(i).zombie.y -= 5;
-									swarm.get(i).yCenter -= 5;
-								
+							 
+							        swarm.get(i).zombie.y -= 10;
+									swarm.get(i).yCenter -= 10;
+									swarm.get(i).knockedBack = true;
+									swarm.get(i).knockBackDir = 1;
 							System.out.println("blocke bottom");
 						}
 						//left
@@ -415,9 +452,10 @@ public class Field extends JPanel implements ActionListener, KeyListener{
 						{
 							swarm.get(i).shouldChase = false;
 							
-								swarm.get(i).zombie.x += 5;
-								swarm.get(i).xCenter += 5;
-							
+								swarm.get(i).zombie.x += 10;
+								swarm.get(i).xCenter += 10;
+								swarm.get(i).knockedBack = true;
+								swarm.get(i).knockBackDir = 2;
 							System.out.println("blocked left");
 							
 							
