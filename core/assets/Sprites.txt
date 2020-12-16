@@ -1,0 +1,26 @@
+Sprites.png
+size: 856, 264
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+Bullet
+  rotate: false
+  xy: 0, 0
+  size: 264, 264
+  orig: 264, 264
+  offset: 0, 0
+  index: -1
+Player
+  rotate: false
+  xy: 264, 0
+  size: 296, 264
+  orig: 296, 264
+  offset: 0, 0
+  index: -1
+Zombie
+  rotate: false
+  xy: 560, 0
+  size: 296, 264
+  orig: 296, 264
+  offset: 0, 0
+  index: -1
