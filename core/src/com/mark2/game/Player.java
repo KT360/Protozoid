@@ -2,6 +2,7 @@ package com.mark2.game;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.badlogic.gdx.graphics.g2d.Sprite;
@@ -28,14 +29,21 @@ public class Player {
 	FixtureDef fixtureDef;
 
 	float x  = 200f;
-	float y = 200f;
+	float y = 400f;
 	int xDir = 0;
-	int yDir = 5;
-	int dashDirX =0;
-	int dashDirY=0;
+	int yDir = 0;
 	int energy = 100;
-	
+
+	boolean isDashing = false;
+
+	int shotgunCounter =0;
+
 	BulletPosManager mam;
+
+	Vector2 vector1;
+	Vector2 vector2;
+
+	ArrayList<Vector2> shotGunVectors = new ArrayList<>();
 
 	public Player(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader)
 	{
@@ -46,7 +54,7 @@ public class Player {
 		
 		sprite.setScale(sprite.getScaleX()/4, sprite.getScaleY()/4);
 
-		//sprite.setOriginCenter();
+		sprite.setOriginCenter();
 		
 		bodyDef = new BodyDef();
 		bodyDef.type = BodyDef.BodyType.DynamicBody;
@@ -58,62 +66,122 @@ public class Player {
 		fixtureDef.density = 0.5f; 
 		fixtureDef.friction = 0.4f;
 		fixtureDef.restitution = 0.4f;
+		fixtureDef.filter.categoryBits = ZombieMania.xPLAYER;
+		//fixtureDef.filter.maskBits = ZombieMania.PLAYER_MASK;
 		
 		
-		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM);
+		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM,this);
 		
 		mam = new BulletPosManager(world);
+
+		initVectors();
 		
 	}
-	
 
-	
+	public void initVectors()
+	{
+		vector1 = new Vector2(1,1);
+		vector2 = new Vector2(-1,1);
+
+		shotGunVectors.add(vector1);
+		shotGunVectors.add(vector2);
+
+	}
+
+	public void setDir(int newDirX, int newDirY)
+	{
+
+		this.xDir = newDirX;
+		this.yDir = newDirY;
+
+	}
+
 
 	
 	public void updatePlayer(SpriteBatch batch)
 	{
-		Vector2 position = body.getPosition();
-		x= position.x;
-		y=position.y;
-		sprite.setPosition(position.x, position.y);
-		//sprite.setOriginCenter();
-		mam.updateManager();
-		sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
+
+		if (isDashing)
+		{
+			Dash();
+
+		}
+		sprite.translate(xDir,yDir);
+		Vector2 spritePos = new Vector2(sprite.getX(),sprite.getY());
+		sprite.setPosition(spritePos.x, spritePos.y);
+		this.x = spritePos.x;
+		this.y = spritePos.y;
+		sprite.setRotation(sprite.getRotation());
+		body.setTransform(spritePos,MathUtils.degreesToRadians * sprite.getRotation());
 		sprite.draw(batch);
 		
 	}
-	
-	
+
+	public void Dash()
+	{
+		if(energy > 0)
+		{
+			setDir((int)mam.currentDir.x *20, (int)mam.currentDir.y *20);
+			energy-=10;
+			if (energy <= 0)
+			{
+				setDir(0,0);
+				energy = 100;
+				isDashing = false;
+
+			}
+		}
+
+
+	}
+	//A manager class that contains all the information that could be possibly need
+	//to be retrieved from the player
+
 	class BulletPosManager
 	{
-		
-		Vector2 spawnPos;
-		float initialOffset;
+
 		BodyDef bDef;
 		Body mBody;
-		Shape shape;
 		FixtureDef fDef;
-		float offsetLength;
 		Vector2 bulletVel;
-		
+		Vector2 currentDir;
+		float initialAngle;
+		Vector2 initialVector;
+		float offset = 50;
+		float length;
+
 		public BulletPosManager(World world)
 		{
-			
-			
-			offsetLength = sprite.getWidth()/4;
-			
-			initialOffset =  y - offsetLength;
-			
-			spawnPos = new Vector2(x,initialOffset);
+
+			initialAngle = -90;
+
+			Vector2 bodyPos = body.getPosition();
+
+			float vecX = x - bodyPos.x;
+			float vecY = (y+offset) - bodyPos.y;
+
+			initialVector = new Vector2(vecX,vecY);
+
+			//Give the bullet an initial direction at the player's initialization
+			length = (float) Math.sqrt(Math.pow(initialVector.x,2)+ Math.pow(initialVector.y,2));
+
+			Vector2 initialBulletVector = new Vector2(initialVector.x/length,initialVector.y/length);
+
+			bulletVel = initialBulletVector;
+
+			currentDir = bulletVel;
+
+			System.out.println(initialVector);
+
+			float actualX = initialVector.x + bodyPos.x;
+			float actualY = initialVector.y + bodyPos.y;
 
 			bDef = new BodyDef();
 			bDef.type = BodyDef.BodyType.KinematicBody;
-			bDef.position.set(spawnPos);
+			bDef.position.set(actualX,actualY);
 			mBody = world.createBody(bDef);
-		
-			
+
 			PolygonShape manager = new PolygonShape();
-			
 			manager.setAsBox(6f, 6f);
 			
 			fDef = new FixtureDef();
@@ -124,57 +192,61 @@ public class Player {
 			fDef.restitution = 0;
 			
 			Fixture fixture = mBody.createFixture(fDef);
-			
+
 			manager.dispose();
 
 		}
-		
-		public void updateManager()
-		{
-			int playerAngle = (int) (MathUtils.radiansToDegrees * body.getAngle());
-			
-			Vector2 newPos;
-			
-			switch(playerAngle)
-			{
-			case 0:
-				
-				bulletVel = new Vector2(0,-100*Constants.PPM);
-				newPos = new Vector2(x,y  - offsetLength);
-				mBody.setTransform(newPos, body.getAngle());
-				
-				break;
-			case 90:
-				
-				bulletVel = new Vector2(100*Constants.PPM,0);
-				newPos = new Vector2(x + offsetLength,y);
-				mBody.setTransform(newPos, body.getAngle());
-				
-				break;
-			case -90:
-				
-				bulletVel = new Vector2(-100*Constants.PPM,0);
-				newPos = new Vector2(x - offsetLength,y);
-				mBody.setTransform(newPos, body.getAngle());
-				
-				break;
-			case 180:
-				
-				bulletVel = new Vector2(0,100*Constants.PPM);
-				newPos = new Vector2(x ,y + offsetLength);
-				mBody.setTransform(newPos, body.getAngle());
-				
-				break;
-			case 360:
-				
-				bulletVel = new Vector2(0,-100*Constants.PPM);
-				newPos = new Vector2(x,y  - offsetLength);
-				mBody.setTransform(newPos, body.getAngle());
-				
-				break;
-				
-			}	
-			
+
+
+		public void updateMam() {
+
+			float bulletFactor = 5;
+
+			Vector2 bodyPosition = body.getPosition();
+
+			float iniX = initialVector.x * (float) Math.cos(body.getAngle()) - initialVector.y * (float) Math.sin(body.getAngle());
+			float iniY = initialVector.x * (float) Math.sin(body.getAngle()) + initialVector.y * (float) Math.cos(body.getAngle());
+
+			float newX = iniX + bodyPosition.x;
+			float newY = iniY + bodyPosition.y;
+
+			//Make it into a unit vector
+
+			float scale = (float)Math.sqrt(Math.pow(iniX,2)+Math.pow(iniY,2));
+
+			float velX = iniX / scale;
+			float velY = iniY / scale;
+
+			bulletVel = new Vector2(velX,velY);
+
+			currentDir = bulletVel;
+
+			Vector2 newVec = new Vector2(newX,newY);
+
+			mBody.setTransform(newVec,body.getAngle());
+
+
+			//Rotate shotgun vectors
+			//TODO: MAKE THIS BETTER
+			Vector2 v1 = vector1;
+			Vector2 v2 = vector2;
+
+			float vX = v1.x * (float) Math.cos(body.getAngle()) - v1.y * (float) Math.sin(body.getAngle());
+			float vY = v1.x * (float) Math.sin(body.getAngle()) + v1.y * (float) Math.cos(body.getAngle());
+
+			Vector2 newV1 = new Vector2(vX,vY);
+
+			shotGunVectors.remove(0);
+			shotGunVectors.add(0,newV1);
+
+			float v2X = v2.x * (float) Math.cos(body.getAngle()) - v2.y * (float) Math.sin(body.getAngle());
+			float v2Y = v2.x * (float) Math.sin(body.getAngle()) + v2.y * (float) Math.cos(body.getAngle());
+
+			Vector2 newV2 = new Vector2(v2X,v2Y);
+
+			shotGunVectors.remove(shotGunVectors.size() - 1);
+			shotGunVectors.add(newV2);
+
 		}
 		
 	}

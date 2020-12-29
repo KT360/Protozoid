@@ -1,25 +1,32 @@
 Sprites.png
-size: 856, 264
+size: 1372, 264
 format: RGBA8888
 filter: Linear,Linear
 repeat: none
 Bullet
   rotate: false
   xy: 0, 0
-  size: 264, 264
-  orig: 264, 264
+  size: 296, 264
+  orig: 296, 264
+  offset: 0, 0
+  index: -1
+Bullet_Particle
+  rotate: false
+  xy: 296, 0
+  size: 484, 264
+  orig: 484, 264
   offset: 0, 0
   index: -1
 Player
   rotate: false
-  xy: 264, 0
+  xy: 780, 0
   size: 296, 264
   orig: 296, 264
   offset: 0, 0
   index: -1
 Zombie
   rotate: false
-  xy: 560, 0
+  xy: 1076, 0
   size: 296, 264
   orig: 296, 264
   offset: 0, 0

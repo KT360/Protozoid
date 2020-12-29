@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
@@ -20,8 +21,8 @@ public class Bullet implements Poolable{
 	
 	float x;
 	float y;
-	int xDir = 0;
-	int yDir = 0;
+	float xDir = 0;
+	float yDir = 0;
 	boolean alive;
 	
 	BodyDef bodyDef;
@@ -33,72 +34,129 @@ public class Bullet implements Poolable{
 	FixtureDef fixtureDef;
 	
 	float Angle;
-	
-	
+
 	
 	public Bullet(HashMap<String, Sprite> sprites, World world,Player player, BodyEditorLoader loader)
 	{
 		
 		alive = false;
 		
-		this.x = player.mam.mBody.getPosition().x;
-		this.y = player.mam.mBody.getPosition().y;
+		x = player.mam.mBody.getPosition().x;
+		y = player.mam.mBody.getPosition().y;
+
+
+		xDir = player.mam.bulletVel.x;
+		yDir = player.mam.bulletVel.y;
 		
 		Angle = player.mam.mBody.getAngle();
 		
 		sprite = sprites.get("Bullet");
 		sprite.setPosition(x, y);
-		sprite.setScale(player.sprite.getScaleX() /2);
-		
-		float scale = (player.sprite.getScaleX()  / 2) * Constants.PPM;
-		
+		sprite.setScale(player.sprite.getScaleX());
+
+
+
 		bodyDef = new BodyDef();
 		bodyDef.type = BodyDef.BodyType.DynamicBody;
 		bodyDef.position.set(x,y);
 		body = world.createBody(bodyDef);
-		
-		body.setTransform(x, y, Angle);
-		body.applyLinearImpulse(player.mam.bulletVel, body.getWorldCenter(), true);
 		body.setUserData(this);
-		body.isBullet();
-		body.setActive(false);
-		
+		body.setTransform(x, y, Angle);
+		body.setSleepingAllowed(false);
+
+
+
 		fixtureDef = new FixtureDef();
-		fixtureDef.density = 0.5f; 
-		fixtureDef.friction = 0.4f;
-		fixtureDef.restitution = 0.0f;
+		fixtureDef.density = 0.01f; 
+		fixtureDef.friction = 0.01f;
+		fixtureDef.restitution = 1.0f;
+		fixtureDef.filter.categoryBits = ZombieMania.xBULLET;
+		//fixtureDef.filter.maskBits = ZombieMania.BULLET_MASK;
+		fixtureDef.isSensor = true;
 	
-		loader.attachFixture(body, "Bullet", fixtureDef, sprite.getScaleX() * Constants.PPM);
+		loader.attachFixture(body, "Bullet", fixtureDef, sprite.getScaleX() * Constants.PPM,this);
 		
 	}
 
 	
 	public void updateBullet(SpriteBatch batch)
 	{
+
+		sprite.setRotation( MathUtils.radiansToDegrees * Angle);
 		
-			Vector2 position = body.getPosition();
-			x= position.x;
-			y=position.y;
-			sprite.setPosition(position.x, position.y);
-			sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
-			sprite.draw(batch);
+		sprite.setPosition(x,y);
 			
-	}
-	
-	
-	
-	public void setXDir(int value)
-	{
-		
-		this.xDir = value;
+		translateSprite(xDir,yDir);
+
+		sprite.draw(batch);
 		
 	}
 	
-	public void setYDir(int value)
+	
+	public void resetBulletVals(Vector2 spawnPos, Vector2 direction, float angle)
 	{
-		this.yDir = value;
 		
+		this.x = spawnPos.x;
+		this.y = spawnPos.y;
 		
+		this.xDir =  direction.x;
+		this.yDir =  direction.y;
+		
+		this.Angle = angle;
+		
+	}
+
+
+	
+	public void translateSprite(float xAmount, float yAmount)
+	{
+		
+		sprite.translate(xAmount, yAmount);
+		
+		Vector2 spritePos = new Vector2(sprite.getX(),sprite.getY());
+		
+		this.x = spritePos.x;
+		this.y = spritePos.y;
+		
+		body.setTransform(x, y, Angle);
+	}
+	
+	public float getDirX()
+	{
+		return xDir;
+
+	}
+
+	public float getDirY()
+	{
+		return yDir;
+
+	}
+
+	public void setDir(int x, int y)
+	{
+		this.xDir = x;
+		this.yDir = y;
+	}
+
+	public void setDir(Vector2 direction)
+	{
+		this.xDir =  direction.x;
+		this.yDir =  direction.y;
+
+	}
+
+	public float getAngle()
+	{
+		return MathUtils.radiansToDegrees * Angle;
+
+	}
+
+	public void setAngle(float newAngle)
+	{
+
+		this.Angle = newAngle;
+
 	}
 	
 	public float getX()
@@ -114,6 +172,15 @@ public class Bullet implements Poolable{
 		return y;
 		
 	}
+
+
+	public Vector2 getSpritePos()
+	{
+		return new Vector2(sprite.getX(),sprite.getY());
+
+	}
+	
+	
 	
 	public Sprite getSprite()
 	{
@@ -124,9 +191,7 @@ public class Bullet implements Poolable{
 
 	@Override
 	public void reset() {
-		
-		x=0;
-		y=0;
+
 		
 		alive = false;
 	}

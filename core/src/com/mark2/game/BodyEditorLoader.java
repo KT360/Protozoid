@@ -5,6 +5,7 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.CircleShape;
+import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
 import com.badlogic.gdx.utils.Array;
@@ -75,7 +76,7 @@ public class BodyEditorLoader {
 	 * @param fd The fixture parameters to apply to the created body fixture.
 	 * @param scale The desired scale of the body. The default width is 1.
 	 */
-	public void attachFixture(Body body, String name, FixtureDef fd, float scale) {
+	public void attachFixture(Body body, String name, FixtureDef fd, float scale,Object data) {
 		RigidBodyModel rbModel = model.rigidBodies.get(name);
 		if (rbModel == null) throw new RuntimeException("Name '" + name + "' was not found.");
 
@@ -92,8 +93,9 @@ public class BodyEditorLoader {
 
 			polygonShape.set(vertices);
 			fd.shape = polygonShape;
-			body.createFixture(fd);
-
+			Fixture fixture =body.createFixture(fd);
+			fixture.setUserData(data);
+			fixture.getBody();
 			for (int ii=0, nn=vertices.length; ii<nn; ii++) {
 				free(vertices[ii]);
 			}
@@ -107,7 +109,8 @@ public class BodyEditorLoader {
 			circleShape.setPosition(center);
 			circleShape.setRadius(radius);
 			fd.shape = circleShape;
-			body.createFixture(fd);
+			Fixture fixture = body.createFixture(fd);
+			fixture.setUserData(data);
 
 			free(center);
 		}

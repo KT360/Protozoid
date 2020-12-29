@@ -20,7 +20,7 @@ public class Zombie {
 
 	Random r = new Random();
 	
-	float x = 20;
+	float x = 400;
 	float y = 300;
 	
 	int width = 50;
@@ -64,26 +64,32 @@ public class Zombie {
 		bodyDef.type = BodyDef.BodyType.DynamicBody;
 		bodyDef.position.set(x, y);
 		body = world.createBody(bodyDef);
+		body.setUserData(this);
 		
-
+		
 		fixtureDef = new FixtureDef();
 		fixtureDef.density = 0.8f; 
 		fixtureDef.friction = 0.4f;
 		fixtureDef.restitution = 0.7f;
+		fixtureDef.filter.categoryBits = ZombieMania.xZOMBIE;
+		//fixtureDef.filter.maskBits = ZombieMania.ZOMBIE_MASK;
 		
 		
-		
-		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM);
+		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM,this);
 	
 	}
 
 	public void updateZombie(SpriteBatch batch) {
 		if (alive) {
 			
-			Vector2 position = body.getPosition();
-			sprite.setPosition(position.x, position.y);
-			sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
+			sprite.setPosition(x, y);
+			
+			Vector2 position = new Vector2(sprite.getX(),sprite.getY());
+			
+			body.setTransform(position, MathUtils.degreesToRadians *sprite.getRotation());
+			
 			sprite.draw(batch);
+			
 		}
 	}
 
