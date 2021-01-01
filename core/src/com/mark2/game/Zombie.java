@@ -27,8 +27,8 @@ public class Zombie {
 	int height = 50;
 	
 	//Added directions
-	int xDir;
-	int yDir;
+	float xDir;
+	float yDir;
 	
 	boolean knockedBack = false;
 	
@@ -79,9 +79,11 @@ public class Zombie {
 	
 	}
 
-	public void updateZombie(SpriteBatch batch) {
+	public void updateZombie(SpriteBatch batch, Player player) {
 		if (alive) {
-			
+
+			//chase(player);
+
 			sprite.setPosition(x, y);
 			
 			Vector2 position = new Vector2(sprite.getX(),sprite.getY());
@@ -96,43 +98,37 @@ public class Zombie {
 	
 //TODO: NEW CHASE METHOD FOR THE ZOMBIE
 //	public void chase(Player player) {
-//
-//		if (player.x > zombie.x) {
-//			
-//			xDir =1;
-//			
-//			x += xDir;
-//			
-//			xCenter += xDir;
-//
-//		}
-//		if (player.y > zombie.y) {
-//			
-//			yDir = 1;
-//			
-//			y += yDir;
-//			
-//			yCenter += yDir;
-//		}
-//		if (player.x < zombie.x ) {
-//			
-//			xDir = -1;
-//			
-//			x += xDir;
-//			
-//			xCenter += xDir;
-//		}
-//		if (player.y < zombie.y ) {
-//			
-//			yDir = -1;
-//			
-//			y += yDir;
-//			
-//			yCenter += yDir;
-//		}
-//
-//		
-//	}
+	public void chase(Player player)
+	{
+		if (y<player.y)
+		{
+			yDir = 1;
+			y+=yDir;
+
+		}
+		else if (y> player.y)
+		{
+			yDir = -1;
+			y+=yDir;
+		}
+		if (x<player.x)
+		{
+			xDir = 1;
+			x+=xDir;
+		}else if (x > player.x)
+		{
+			xDir = -1;
+			x+=xDir;
+		}
+
+	}
+
+	public void setDir(float x, float y)
+	{
+		this.xDir = x;
+		this.yDir = y;
+
+	}
 
 
 	

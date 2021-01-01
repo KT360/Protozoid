@@ -30,8 +30,8 @@ public class Player {
 
 	float x  = 200f;
 	float y = 400f;
-	int xDir = 0;
-	int yDir = 0;
+	float xDir = 0;
+	float yDir = 0;
 	int energy = 100;
 
 	boolean isDashing = false;
@@ -88,7 +88,7 @@ public class Player {
 
 	}
 
-	public void setDir(int newDirX, int newDirY)
+	public void setDir(float newDirX, float newDirY)
 	{
 
 		this.xDir = newDirX;
@@ -121,8 +121,11 @@ public class Player {
 	{
 		if(energy > 0)
 		{
-			setDir((int)mam.currentDir.x *20, (int)mam.currentDir.y *20);
+			Vector2 dashDir = new Vector2(mam.currentDir.x *20,mam.currentDir.y *20);
+			System.out.println(dashDir);
+			setDir(mam.currentDir.x *20, mam.currentDir.y *20);
 			energy-=10;
+			System.out.println(mam.currentDir);
 			if (energy <= 0)
 			{
 				setDir(0,0);
@@ -219,7 +222,7 @@ public class Player {
 
 			bulletVel = new Vector2(velX,velY);
 
-			currentDir = bulletVel;
+			currentDir = new Vector2(velX,velY);
 
 			Vector2 newVec = new Vector2(newX,newY);
 

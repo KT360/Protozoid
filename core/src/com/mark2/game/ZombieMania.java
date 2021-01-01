@@ -1,5 +1,6 @@
 package com.mark2.game;
 
+import java.awt.*;
 import java.security.Key;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,6 +81,15 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	ArrayList<Bullet> activeBullets = new ArrayList<Bullet>();
 	
 	ParticleEffect effect;
+
+	TextureAtlas UI;
+
+	Sprite health;
+
+	Sprite minusHealth;
+
+	int counter =0;
+
 	@Override
 	public void create () {
 		
@@ -100,6 +110,8 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		debugRenderer = new Box2DDebugRenderer();
 		
 		textureAtlas = new TextureAtlas("Sprites.txt");
+
+		UI = new TextureAtlas("UI/UI.txt");
 
 		batch = new SpriteBatch();
 		
@@ -131,10 +143,15 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
     	};
         
-        magazine = new BulletManager(sprites,player,world);
-        
-        
-        
+         magazine = new BulletManager(sprites,player,world);
+
+         //HealthBar
+		 minusHealth = UI.createSprite("MinusHealth");
+		 minusHealth.setPosition(85,-91);
+
+		 health = UI.createSprite("HealthBar");
+		 health.setPosition(-75,-100);
+
 	}
 
 
@@ -227,7 +244,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	  
 	     batch.begin();
 	     
-	     zombie.updateZombie(batch);
+	     zombie.updateZombie(batch,player);
 //	     
 	     player.updatePlayer(batch);
 	     
@@ -243,6 +260,12 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	     effect.update(Gdx.graphics.getDeltaTime());
 	     
 	     effect.draw(batch);
+
+		 minusHealth.draw(batch);
+
+	     health.draw(batch);
+
+	     drawSprite(health);
 	     
 	     batch.end();
 	     
@@ -405,7 +428,6 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		{
 			player.setDir(0,0);
 
-
 		}
 		if(keycode == Keys.A)
 		{
@@ -422,6 +444,11 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 			
 		}
 
+		if (keycode == Keys.SPACE)
+		{
+			player.energy = 100;
+
+		}
 		return false;
 	}
 
@@ -449,13 +476,16 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {return false;}
 
+
 	@Override
 	//TODO: It looks like the problem is the player's sprite position, gotta fix that...
 	public boolean mouseMoved(int screenX, int screenY) {
 
+		float weirdOffset = 70;
+
 		Vector2 mousePos = new Vector2(screenX,screenY);
 
-		Vector2 relativeMousePos = new Vector2( screenX - player.sprite.getX(), screenY - player.sprite.getY());
+		Vector2 relativeMousePos = new Vector2( (screenX-weirdOffset) - player.sprite.getX(), screenY - player.sprite.getY());
 
 		float mouseLength = (float) Math.sqrt(Math.pow(relativeMousePos.x,2) + Math.pow(relativeMousePos.y,2));
 
@@ -463,11 +493,17 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 		Vector2 playerVec = new Vector2(player.mam.initialVector.x/player.mam.length,player.mam.initialVector.y/player.mam.length);
 
+		//THis time we have to calculate the dot product, and the determinant
 		float DP = (playerVec.x * mouseVec.x) + (playerVec.y * mouseVec.y);
 
-		float angle = (float) Math.acos(DP);
+		float DE = (playerVec.x * mouseVec.y) - (playerVec.y * mouseVec.x);
+
+		float angle = (float) Math.atan2(DE,DP);
 
 		player.sprite.setRotation(MathUtils.radiansToDegrees * angle);
+
+		player.mam.updateMam();
+
 		return false;
 	}
 
@@ -492,17 +528,15 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 			
 			if(fixA.getBody().getUserData() instanceof Zombie)
 			{
-	
-				
 				
 				Zombie zombie = (Zombie) fixA.getBody().getUserData();
+
+				Bullet bullet =  (Bullet) fixB.getBody().getUserData();
 				
-				Vector2 pushDir = player.mam.bulletVel;
+				Vector2 pushDir = bullet.getDir();
 				
 				zombie.x += pushDir.x;
 				zombie.y += pushDir.y;
-				
-				Bullet bullet =  (Bullet) fixB.getBody().getUserData();
 				
 				effect.setPosition(bullet.x+(Constants.PPM/2), bullet.y+(Constants.PPM/2));
 				
@@ -525,6 +559,29 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 				
 			
 		    }
+
+			case xZOMBIE | xPLAYER:
+
+				if (fixA.getBody().getUserData() instanceof  Player)
+				{
+
+					if (!player.isDashing) {
+						counter++;
+						System.out.println(health.getWidth() + "," + health.getHeight());
+						health.setPosition(health.getX() - 40, health.getY());
+						if (health.getX() == -355) {
+							zombie.alive = false;
+
+						}
+
+					}
+
+				}
+				if (fixB.getBody().getUserData() instanceof  Zombie)
+				{
+
+					System.out.println("Zombie!");
+				}
 
 		    	    
 		}

@@ -81,7 +81,6 @@ public class Bullet implements Poolable{
 	
 	public void updateBullet(SpriteBatch batch)
 	{
-
 		sprite.setRotation( MathUtils.radiansToDegrees * Angle);
 		
 		sprite.setPosition(x,y);
@@ -90,6 +89,11 @@ public class Bullet implements Poolable{
 
 		sprite.draw(batch);
 		
+	}
+
+	public Vector2 getDir()
+	{
+		return new Vector2(xDir,yDir);
 	}
 	
 	
