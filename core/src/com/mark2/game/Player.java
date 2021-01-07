@@ -52,7 +52,7 @@ public class Player {
 		
 		sprite.setPosition(x, y);
 		
-		sprite.setScale(sprite.getScaleX()/4, sprite.getScaleY()/4);
+		sprite.setScale(0.1f);
 
 		sprite.setOriginCenter();
 		
@@ -85,6 +85,12 @@ public class Player {
 
 		shotGunVectors.add(vector1);
 		shotGunVectors.add(vector2);
+
+	}
+
+	public Vector2 getPos()
+	{
+		return new Vector2(x,y);
 
 	}
 
@@ -155,7 +161,6 @@ public class Player {
 
 		public BulletPosManager(World world)
 		{
-
 			initialAngle = -90;
 
 			Vector2 bodyPos = body.getPosition();

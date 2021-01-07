@@ -79,6 +79,8 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	Pool<Bullet> bulletPool;
 	
 	ArrayList<Bullet> activeBullets = new ArrayList<Bullet>();
+
+	ArrayList<Zombie> horde;
 	
 	ParticleEffect effect;
 
@@ -119,6 +121,8 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 		camera.setToOrtho(true);
 
+		camera.zoom = 1;
+
         viewport = new ExtendViewport(800, 600, camera);
 
         Gdx.input.setInputProcessor(this);
@@ -127,8 +131,12 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
         
         player = new Player(sprites,world,loader);
 
-        zombie = new Zombie(sprites,world,loader);
-        
+		horde = new ArrayList<>();
+
+        for (int i =0; i<10; i++) {
+
+			horde.add(new Zombie(sprites, world, loader));
+		}
         
         bulletPool  = new Pool<Bullet>()
     	{
@@ -243,9 +251,13 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	     checkInput(); 
 	  
 	     batch.begin();
-	     
-	     zombie.updateZombie(batch,player);
-//	     
+	     if(horde != null)
+		 {
+			 for (Zombie z : horde)
+			 {
+				z.updateZombie(batch,player);
+			 }
+	     }
 	     player.updatePlayer(batch);
 	     
 	     for(Bullet bullet : activeBullets)
@@ -464,7 +476,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		else
 		{
 
-			shotgunBaby(20);
+			shotgunBaby(5);
 		}
 
 		return false;
@@ -478,30 +490,29 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 
 	@Override
-	//TODO: It looks like the problem is the player's sprite position, gotta fix that...
 	public boolean mouseMoved(int screenX, int screenY) {
 
 		float weirdOffset = 70;
-
+//
 		Vector2 mousePos = new Vector2(screenX,screenY);
-
+//
 		Vector2 relativeMousePos = new Vector2( (screenX-weirdOffset) - player.sprite.getX(), screenY - player.sprite.getY());
-
+//
 		float mouseLength = (float) Math.sqrt(Math.pow(relativeMousePos.x,2) + Math.pow(relativeMousePos.y,2));
-
+//
 		Vector2 mouseVec = new Vector2(relativeMousePos.x/mouseLength,relativeMousePos.y/mouseLength);
-
+//
 		Vector2 playerVec = new Vector2(player.mam.initialVector.x/player.mam.length,player.mam.initialVector.y/player.mam.length);
-
-		//THis time we have to calculate the dot product, and the determinant
+//
+//		//THis time we have to calculate the dot product, and the determinant
 		float DP = (playerVec.x * mouseVec.x) + (playerVec.y * mouseVec.y);
-
+//
 		float DE = (playerVec.x * mouseVec.y) - (playerVec.y * mouseVec.x);
-
+//
 		float angle = (float) Math.atan2(DE,DP);
-
+//
 		player.sprite.setRotation(MathUtils.radiansToDegrees * angle);
-
+//
 		player.mam.updateMam();
 
 		return false;
@@ -528,15 +539,22 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 			
 			if(fixA.getBody().getUserData() instanceof Zombie)
 			{
-				
+
 				Zombie zombie = (Zombie) fixA.getBody().getUserData();
 
 				Bullet bullet =  (Bullet) fixB.getBody().getUserData();
-				
+
 				Vector2 pushDir = bullet.getDir();
-				
+
 				zombie.x += pushDir.x;
 				zombie.y += pushDir.y;
+
+				zombie.Health -= 10;
+
+				if (zombie.Health <= 0)
+				{
+					zombie.alive = false;
+				}
 				
 				effect.setPosition(bullet.x+(Constants.PPM/2), bullet.y+(Constants.PPM/2));
 				
@@ -567,20 +585,17 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 					if (!player.isDashing) {
 						counter++;
-						System.out.println(health.getWidth() + "," + health.getHeight());
 						health.setPosition(health.getX() - 40, health.getY());
 						if (health.getX() == -355) {
-							zombie.alive = false;
-
+							System.out.println("Player Dead X.X");
 						}
 
+					}else if (fixB.getBody().getUserData() instanceof Zombie)
+					{
+						Zombie zombie = (Zombie) fixB.getBody().getUserData();
+						zombie.setDir(player.mam.currentDir.x,player.mam.currentDir.y);
+
 					}
-
-				}
-				if (fixB.getBody().getUserData() instanceof  Zombie)
-				{
-
-					System.out.println("Zombie!");
 				}
 
 		    	    

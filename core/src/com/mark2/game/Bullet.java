@@ -35,6 +35,8 @@ public class Bullet implements Poolable{
 	
 	float Angle;
 
+	float velocityFactor = 5;
+
 	
 	public Bullet(HashMap<String, Sprite> sprites, World world,Player player, BodyEditorLoader loader)
 	{
@@ -67,12 +69,13 @@ public class Bullet implements Poolable{
 
 
 		fixtureDef = new FixtureDef();
+		fixtureDef.isSensor = true;
 		fixtureDef.density = 0.01f; 
 		fixtureDef.friction = 0.01f;
 		fixtureDef.restitution = 1.0f;
 		fixtureDef.filter.categoryBits = ZombieMania.xBULLET;
 		//fixtureDef.filter.maskBits = ZombieMania.BULLET_MASK;
-		fixtureDef.isSensor = true;
+
 	
 		loader.attachFixture(body, "Bullet", fixtureDef, sprite.getScaleX() * Constants.PPM,this);
 		
@@ -103,8 +106,7 @@ public class Bullet implements Poolable{
 		this.x = spawnPos.x;
 		this.y = spawnPos.y;
 		
-		this.xDir =  direction.x;
-		this.yDir =  direction.y;
+		setDir(direction.x,direction.y);
 		
 		this.Angle = angle;
 		
@@ -137,12 +139,13 @@ public class Bullet implements Poolable{
 
 	}
 
-	public void setDir(int x, int y)
+	public void setDir(float x, float y)
 	{
-		this.xDir = x;
-		this.yDir = y;
+		this.xDir = x*velocityFactor;
+		this.yDir = y*velocityFactor;
 	}
 
+	//For vectors
 	public void setDir(Vector2 direction)
 	{
 		this.xDir =  direction.x;
@@ -196,7 +199,6 @@ public class Bullet implements Poolable{
 	@Override
 	public void reset() {
 
-		
 		alive = false;
 	}
 

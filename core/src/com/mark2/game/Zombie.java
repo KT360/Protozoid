@@ -20,44 +20,31 @@ public class Zombie {
 
 	Random r = new Random();
 	
-	float x = 400;
-	float y = 300;
-	
-	int width = 50;
-	int height = 50;
+	float x = r.nextInt(400);
+	float y = r.nextInt(200);
 	
 	//Added directions
-	float xDir;
-	float yDir;
-	
-	boolean knockedBack = false;
-	
-	public Rectangle zombie;
+	float xDir = 0;
+	float yDir = 0;
 	
 	public boolean alive = true;
 	
-	int knockBackForce = 3;
-	
-	boolean shouldChase = true;
-	
-	int knockBackDir;
-	
 	public int Health = 100;
 
-	float xCenter = x + 25;
-	float yCenter = y + 25;
-	
+	boolean attacking = false;
+
 	Sprite sprite;
 	BodyDef bodyDef;
 	Body body;
 	FixtureDef fixtureDef;
-	
+
+	Vector2 dashDir = new Vector2(0,0);
 	
 	public Zombie(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader) {
 
 		sprite = sprites.get("Zombie");
 		sprite.setPosition(x,y);
-		sprite.setScale(sprite.getScaleX()/4, sprite.getScaleY()/4);
+		sprite.setScale(0.1f);
 		sprite.setCenter(sprite.getWidth() /2f, sprite.getHeight() /2f);
 		
 		bodyDef = new BodyDef();
@@ -76,13 +63,13 @@ public class Zombie {
 		
 		
 		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM,this);
-	
+		System.out.println(x+","+y);
 	}
 
 	public void updateZombie(SpriteBatch batch, Player player) {
 		if (alive) {
 
-			//chase(player);
+			chase(player);
 
 			sprite.setPosition(x, y);
 			
@@ -93,6 +80,9 @@ public class Zombie {
 			sprite.draw(batch);
 			
 		}
+//		else{
+//			body.setActive(false);
+//		}
 	}
 
 	
@@ -100,33 +90,65 @@ public class Zombie {
 //	public void chase(Player player) {
 	public void chase(Player player)
 	{
-		if (y<player.y)
-		{
-			yDir = 1;
-			y+=yDir;
+
+		Vector2 direction = new Vector2(player.x - x, player.y -y);
+
+		float length = (float) Math.sqrt(Math.pow(direction.x,2)+Math.pow(direction.y,2));
+
+		Vector2 chaseDir = new Vector2(direction.x/length,direction.y/length);
+
+		checkRange(player);
+
+		if (attacking) {
+			xDir = dashDir.x*10;
+			yDir = dashDir.y*10;
+		}else {
+
+			dashDir = chaseDir;
+			xDir = chaseDir.x;
+			yDir = chaseDir.y;
 
 		}
-		else if (y> player.y)
-		{
-			yDir = -1;
-			y+=yDir;
-		}
-		if (x<player.x)
-		{
-			xDir = 1;
-			x+=xDir;
-		}else if (x > player.x)
-		{
-			xDir = -1;
-			x+=xDir;
-		}
+		move();
 
 	}
 
+	public void checkRange(Player player)
+	{
+		float attackRange = 200;
+
+		float currentRange = (float) Math.sqrt(Math.pow((player.getPos().x - x),2)+Math.pow((player.getPos().y - y),2));
+
+		if (currentRange < attackRange)
+		{
+			attacking = true;
+		}
+		else
+		{
+			attacking = false;
+		}
+	}
+
+	public void move()
+	{
+		x+=xDir;
+		y+=yDir;
+	}
 	public void setDir(float x, float y)
 	{
 		this.xDir = x;
 		this.yDir = y;
+
+	}
+
+	public float getDirX()
+	{
+		return xDir;
+	}
+
+	public float getDirY()
+	{
+		return yDir;
 
 	}
 
