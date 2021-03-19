@@ -11,9 +11,9 @@ DEMO
 
 #Premise:
 
--Careful not to get spotted by the horde of zombies! 
--Use (SHIFT) to switch from your regular pistol to a wider spread shot-gun!
--If cornered, press (SPACE) TO DASH.
+-Careful not to get spotted by the horde of zombies! /n
+-Use (SHIFT) to switch from your regular pistol to a wider spread shot-gun!/n
+-If cornered, press (SPACE) TO DASH./n
 -And most importantly, use (LEFT CONTROL + LEFT CLICK) in order to teleport from any Structure for a fast counter-attack.
 
 #Status:
