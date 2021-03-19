@@ -33,6 +33,9 @@ public class BodyEditorLoader {
 	private final PolygonShape polygonShape = new PolygonShape();
 	private final CircleShape circleShape = new CircleShape();
 	private final Vector2 vec = new Vector2();
+	//My stuff
+	public Vector2[] shapeVertices;
+	public List<List<Vector2>> vertices;
 
 	// -------------------------------------------------------------------------
 	// Ctors
@@ -78,6 +81,13 @@ public class BodyEditorLoader {
 	 */
 	public void attachFixture(Body body, String name, FixtureDef fd, float scale,Object data) {
 		RigidBodyModel rbModel = model.rigidBodies.get(name);
+		vertices = new ArrayList<>();
+		for(int i =0; i<rbModel.polygons.size(); i++)
+		{
+			PolygonModel polygonModel = rbModel.polygons.get(i);
+			vertices.add(polygonModel.vertices);
+		}
+		System.out.println(name+"->"+rbModel.polygons.size());
 		if (rbModel == null) throw new RuntimeException("Name '" + name + "' was not found.");
 
 		Vector2 origin = vec.set(rbModel.origin).scl(scale);
@@ -85,13 +95,14 @@ public class BodyEditorLoader {
 		for (int i=0, n=rbModel.polygons.size(); i<n; i++) {
 			PolygonModel polygon = rbModel.polygons.get(i);
 			Vector2[] vertices = polygon.buffer;
-
 			for (int ii=0, nn=vertices.length; ii<nn; ii++) {
 				vertices[ii] = newVec().set(polygon.vertices.get(ii)).scl(scale);
 				vertices[ii].sub(origin);
 			}
 
 			polygonShape.set(vertices);
+
+			shapeVertices = vertices;
 			fd.shape = polygonShape;
 			Fixture fixture =body.createFixture(fd);
 			fixture.setUserData(data);
@@ -115,6 +126,7 @@ public class BodyEditorLoader {
 			free(center);
 		}
 	}
+
 
 	/**
 	 * Gets the image path attached to the given name.
@@ -163,7 +175,7 @@ public class BodyEditorLoader {
 		public final List<PolygonModel> polygons = new ArrayList<PolygonModel>();
 		public final List<CircleModel> circles = new ArrayList<CircleModel>();
 	}
-
+	//PolygonModel class
 	public static class PolygonModel {
 		public final List<Vector2> vertices = new ArrayList<Vector2>();
 		private Vector2[] buffer; // used to avoid allocation in attachFixture()

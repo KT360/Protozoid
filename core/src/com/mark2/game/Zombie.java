@@ -16,11 +16,11 @@ import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 
-public class Zombie {
+public class Zombie implements Entity{
 
 	Random r = new Random();
 	
-	float x = r.nextInt(400);
+	float x = r.nextInt(200);
 	float y = r.nextInt(200);
 	
 	//Added directions
@@ -28,24 +28,24 @@ public class Zombie {
 	float yDir = 0;
 	
 	public boolean alive = true;
-	
 	public int Health = 100;
-
-	boolean attacking = false;
+	boolean alert = false;
+	boolean spotPlayer = false;
 
 	Sprite sprite;
 	BodyDef bodyDef;
 	Body body;
 	FixtureDef fixtureDef;
-
-	Vector2 dashDir = new Vector2(0,0);
+	Vector2[] originalShapeVertices;
+	Vector2[] scaledShapeVertices;
+	Vector2 dashDir;
 	
-	public Zombie(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader) {
+	public Zombie(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader, Player player) {
 
 		sprite = sprites.get("Zombie");
-		sprite.setPosition(x,y);
-		sprite.setScale(0.1f);
-		sprite.setCenter(sprite.getWidth() /2f, sprite.getHeight() /2f);
+		sprite.setOriginBasedPosition(x,y);
+		sprite.setOriginCenter();
+		sprite.setScale(Constants.SPRITE_SCALING);
 		
 		bodyDef = new BodyDef();
 		bodyDef.type = BodyDef.BodyType.DynamicBody;
@@ -53,61 +53,77 @@ public class Zombie {
 		body = world.createBody(bodyDef);
 		body.setUserData(this);
 		
-		
 		fixtureDef = new FixtureDef();
-		fixtureDef.density = 0.8f; 
+		fixtureDef.density = 0.1f;
 		fixtureDef.friction = 0.4f;
-		fixtureDef.restitution = 0.7f;
+		fixtureDef.restitution = 0.1f;
 		fixtureDef.filter.categoryBits = ZombieMania.xZOMBIE;
 		//fixtureDef.filter.maskBits = ZombieMania.ZOMBIE_MASK;
 		
 		
 		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM,this);
-		System.out.println(x+","+y);
+		originalShapeVertices = loader.shapeVertices;
+		scaledShapeVertices = new Vector2[originalShapeVertices.length];
+		updatePolygonVertices();
+		dashDir = new Vector2(0, 0);
 	}
 
 	public void updateZombie(SpriteBatch batch, Player player) {
-		if (alive) {
-
+		if (spotPlayer && player.alive)
+		{
 			chase(player);
-
-			sprite.setPosition(x, y);
-			
-			Vector2 position = new Vector2(sprite.getX(),sprite.getY());
-			
-			body.setTransform(position, MathUtils.degreesToRadians *sprite.getRotation());
-			
-			sprite.draw(batch);
-			
 		}
-//		else{
-//			body.setActive(false);
-//		}
+		Vector2 position = body.getPosition();
+		this.x = position.x;
+		this.y = position.y;
+		sprite.setOriginBasedPosition(x,y);
+		sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
+		updatePolygonVertices();
+		sprite.draw(batch);
+	}
+	public void updatePolygonVertices()
+	{
+		//Update Polygon
+		for (int i =0; i<scaledShapeVertices.length; i++)
+		{
+			Vector2 originalVertex = originalShapeVertices[i];
+			Vector2 updatedVertex = new Vector2(originalVertex.x + body.getPosition().x, originalVertex.y + body.getPosition().y);
+			scaledShapeVertices[i] = updatedVertex;
+		}
 	}
 
+	public float[] getPolygonVectors(Vector2 [] vertices)
+	{
+		float[] copiedVertices = new float[vertices.length * 2];
+		for (int i=0, j=0; i<copiedVertices.length; i+=2,j++)
+		{
+			copiedVertices[i] = vertices[j].x;
+			copiedVertices[i+1] = vertices[j].y;
+
+		}
+
+		return copiedVertices;
+
+	}
 	
-//TODO: NEW CHASE METHOD FOR THE ZOMBIE
-//	public void chase(Player player) {
+//If zombie spots player, get the vector from zombie to player. If within range, lunge at the player
+	//else, keep chasing using the vector
 	public void chase(Player player)
 	{
-
-		Vector2 direction = new Vector2(player.x - x, player.y -y);
-
+		Vector2 direction = new Vector2(player.x - x, player.y - y);
 		float length = (float) Math.sqrt(Math.pow(direction.x,2)+Math.pow(direction.y,2));
-
 		Vector2 chaseDir = new Vector2(direction.x/length,direction.y/length);
 
 		checkRange(player);
 
-		if (attacking) {
+		if (alert) {
 			xDir = dashDir.x*10;
 			yDir = dashDir.y*10;
 		}else {
 
 			dashDir = chaseDir;
-			xDir = chaseDir.x;
-			yDir = chaseDir.y;
-
+			xDir = chaseDir.x*5;
+			yDir = chaseDir.y*5;
 		}
 		move();
 
@@ -115,24 +131,22 @@ public class Zombie {
 
 	public void checkRange(Player player)
 	{
-		float attackRange = 200;
-
+		float attackRange = 80;
 		float currentRange = (float) Math.sqrt(Math.pow((player.getPos().x - x),2)+Math.pow((player.getPos().y - y),2));
 
 		if (currentRange < attackRange)
 		{
-			attacking = true;
+			alert = true;
 		}
 		else
 		{
-			attacking = false;
+			alert = false;
 		}
 	}
 
 	public void move()
 	{
-		x+=xDir;
-		y+=yDir;
+		body.setLinearVelocity(xDir*50,yDir*50);
 	}
 	public void setDir(float x, float y)
 	{
@@ -181,6 +195,42 @@ public class Zombie {
 		this.y = x;
 		
 		
+	}
+
+	@Override
+	public void checkCollision(Entity otherEntity) {
+		if(otherEntity != null){
+			switch (otherEntity.getType())
+			{
+				case Constants.BULLET_TYPE:
+					if (Health > 0)
+					{
+						Health-=10;
+					}else{
+						alive = false;
+					}
+					break;
+				case Constants.PLAYER_TYPE:
+					Player player = (Player) otherEntity;
+					if (player.health > 0) {
+						player.health -= 10;
+					}else{
+						player.alive = false;
+					}
+					System.out.println("!!!");
+					break;
+			}
+		}
+	}
+	@Override
+	public int getType()
+	{
+		return Constants.ZOMBIE_TYPE;
+	}
+
+	@Override
+	public Body getBody() {
+		return this.body;
 	}
 
 }

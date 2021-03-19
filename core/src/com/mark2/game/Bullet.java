@@ -4,12 +4,12 @@ package com.mark2.game;
 import java.util.HashMap;
 
 
-import com.badlogic.ashley.core.Entity;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
@@ -17,45 +17,34 @@ import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.utils.Pool.Poolable;
 
-public class Bullet implements Poolable{
+public class Bullet implements Poolable, Entity {
 	
 	float x;
 	float y;
 	float xDir = 0;
 	float yDir = 0;
 	boolean alive;
-	
 	BodyDef bodyDef;
-	
 	Body body;
-	
 	Sprite sprite;
-	
 	FixtureDef fixtureDef;
-	
 	float Angle;
-
-	float velocityFactor = 5;
+	float aliveTime = 120;
 
 	
-	public Bullet(HashMap<String, Sprite> sprites, World world,Player player, BodyEditorLoader loader)
+	public Bullet(HashMap<String, Sprite> sprites, World world,Player player,Vector2 direction, BodyEditorLoader loader)
 	{
-		
 		alive = false;
 		
 		x = player.mam.mBody.getPosition().x;
 		y = player.mam.mBody.getPosition().y;
 
-
-		xDir = player.mam.bulletVel.x;
-		yDir = player.mam.bulletVel.y;
-		
 		Angle = player.mam.mBody.getAngle();
-		
-		sprite = sprites.get("Bullet");
-		sprite.setPosition(x, y);
-		sprite.setScale(player.sprite.getScaleX());
 
+		sprite = sprites.get("Bullet");
+		sprite.setOriginBasedPosition(x,y);
+		sprite.setOriginCenter();
+		sprite.setScale(player.sprite.getScaleX());
 
 
 		bodyDef = new BodyDef();
@@ -64,67 +53,46 @@ public class Bullet implements Poolable{
 		body = world.createBody(bodyDef);
 		body.setUserData(this);
 		body.setTransform(x, y, Angle);
-		body.setSleepingAllowed(false);
-
-
 
 		fixtureDef = new FixtureDef();
-		fixtureDef.isSensor = true;
-		fixtureDef.density = 0.01f; 
+		fixtureDef.density = 1.01f;
 		fixtureDef.friction = 0.01f;
-		fixtureDef.restitution = 1.0f;
+		fixtureDef.restitution = 0.5f;
 		fixtureDef.filter.categoryBits = ZombieMania.xBULLET;
 		//fixtureDef.filter.maskBits = ZombieMania.BULLET_MASK;
 
-	
 		loader.attachFixture(body, "Bullet", fixtureDef, sprite.getScaleX() * Constants.PPM,this);
-		
+
 	}
 
 	
 	public void updateBullet(SpriteBatch batch)
 	{
-		sprite.setRotation( MathUtils.radiansToDegrees * Angle);
-		
-		sprite.setPosition(x,y);
-			
-		translateSprite(xDir,yDir);
-
+		Vector2 position = body.getPosition();
+		this.x = position.x;
+		this.y = position.y;
+		sprite.setOriginBasedPosition(x,y);
 		sprite.draw(batch);
-		
+		aliveTime--;
+		if (aliveTime < 0)
+		{
+			alive = false;
+		}
 	}
 
 	public Vector2 getDir()
 	{
 		return new Vector2(xDir,yDir);
 	}
-	
-	
-	public void resetBulletVals(Vector2 spawnPos, Vector2 direction, float angle)
+
+
+	public void resetBulletVals(Vector2 spawnPos, Vector2 direction, float angle,float aliveTime)
 	{
-		
-		this.x = spawnPos.x;
-		this.y = spawnPos.y;
-		
+		body.setTransform(spawnPos,angle);
 		setDir(direction.x,direction.y);
-		
 		this.Angle = angle;
-		
-	}
-
-
-	
-	public void translateSprite(float xAmount, float yAmount)
-	{
-		
-		sprite.translate(xAmount, yAmount);
-		
-		Vector2 spritePos = new Vector2(sprite.getX(),sprite.getY());
-		
-		this.x = spritePos.x;
-		this.y = spritePos.y;
-		
-		body.setTransform(x, y, Angle);
+		this.aliveTime = aliveTime;
+		body.setActive(true);
 	}
 	
 	public float getDirX()
@@ -141,8 +109,9 @@ public class Bullet implements Poolable{
 
 	public void setDir(float x, float y)
 	{
-		this.xDir = x*velocityFactor;
-		this.yDir = y*velocityFactor;
+		this.xDir = x;
+		this.yDir = y;
+		body.setLinearVelocity(xDir*200,yDir*200);
 	}
 
 	//For vectors
@@ -150,7 +119,7 @@ public class Bullet implements Poolable{
 	{
 		this.xDir =  direction.x;
 		this.yDir =  direction.y;
-
+		body.setLinearVelocity(xDir*200,yDir*200);
 	}
 
 	public float getAngle()
@@ -161,30 +130,22 @@ public class Bullet implements Poolable{
 
 	public void setAngle(float newAngle)
 	{
-
 		this.Angle = newAngle;
-
 	}
 	
 	public float getX()
 	{
-		
 		return x;
-		
 	}
 	
 	public float getY()
 	{
-		
 		return y;
-		
 	}
-
 
 	public Vector2 getSpritePos()
 	{
 		return new Vector2(sprite.getX(),sprite.getY());
-
 	}
 	
 	
@@ -200,7 +161,26 @@ public class Bullet implements Poolable{
 	public void reset() {
 
 		alive = false;
+		//this.body.getWorld().destroyBody(body);
 	}
 
+
+	@Override
+	public void checkCollision(Entity otherEntity) {
+		if (otherEntity != null)
+		{
+
+		}
+	}
+
+	@Override
+	public int getType() {
+		return Constants.BULLET_TYPE;
+	}
+
+	@Override
+	public Body getBody() {
+		return this.body;
+	}
 
 }

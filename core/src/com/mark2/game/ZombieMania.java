@@ -1,52 +1,45 @@
 package com.mark2.game;
 
 import java.awt.*;
+import java.awt.geom.Line2D;
 import java.security.Key;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Random;
-import java.util.Vector;
+import java.util.*;
+import java.util.List;
 
 
+import box2dLight.PointLight;
+import box2dLight.RayHandler;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.ParticleEffect;
-import com.badlogic.gdx.graphics.g2d.ParticleEmitter;
-import com.badlogic.gdx.graphics.g2d.Sprite;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.*;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
-import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.graphics.glutils.FrameBuffer;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.*;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.math.Vector3;
-import com.badlogic.gdx.physics.box2d.Box2D;
-import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
-import com.badlogic.gdx.physics.box2d.Contact;
-import com.badlogic.gdx.physics.box2d.ContactImpulse;
-import com.badlogic.gdx.physics.box2d.ContactListener;
-import com.badlogic.gdx.physics.box2d.Fixture;
-import com.badlogic.gdx.physics.box2d.Manifold;
-import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.physics.box2d.*;
+import com.badlogic.gdx.physics.box2d.Shape;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.FloatArray;
 import com.badlogic.gdx.utils.Pool;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.StretchViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import sun.awt.SunHints;
+
+import javax.swing.*;
 
 
 public class ZombieMania extends ApplicationAdapter implements InputProcessor,ContactListener{
 	
 	TextureAtlas textureAtlas;
-	SpriteBatch batch;
-	OrthographicCamera camera;
-    ExtendViewport viewport;
-    
-    
+
     static final float STEP_TIME = 1f / 60f;
     static final int VELOCITY_ITERATIONS = 6;
     static final int POSITION_ITERATIONS = 2;
@@ -67,120 +60,297 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	int itemSelect = 1;
 
 	Player player;
-	Zombie zombie;
-	BulletManager magazine;
 
 	World world;
 	BodyEditorLoader loader;
+	BodyEditorLoader structureLoader;
 	Box2DDebugRenderer debugRenderer;
-
-	private float accumulator = 0;
+	RayHandler rayHandler;
+	PointLight light;
+	PointLight light2;
 
 	Pool<Bullet> bulletPool;
-	
-	ArrayList<Bullet> activeBullets = new ArrayList<Bullet>();
-
+	ArrayList<Bullet> activeBullets;
+	ArrayList<Entity> deadEntities;
+	//Array<Entity> toBeDestroyed;
+	ArrayList<Structure> worldStructures;
 	ArrayList<Zombie> horde;
-	
+	Map<Float,PointOfIntersection> tpIntersections;
+
+	//RAY CASTING stuff
+	PolygonSprite poly;
+	PolygonSpriteBatch polyBatch;
+	PolygonRegion polyReg;
+	Texture textureSolid;
+	Pixmap pix;
+	float[] rayAngles;
+	float[] rayPolygon;
+	ShapeRenderer shapeRenderer;
+	EarClippingTriangulator triangulator;
+	ArrayList<Line2D.Float> rays;
+	Vector2[] currentBoundaries;
+	Structure boundaries;
+
 	ParticleEffect effect;
-
 	TextureAtlas UI;
-
 	Sprite health;
-
 	Sprite minusHealth;
+	Structure demo;
+	Structure demo1;
+	Structure demo2;
+	Structure demo3;
 
-	int counter =0;
+	boolean gameLightOn = true;
+	boolean tpEngaged = false;
+	boolean allowedToTP = false;
+	float worldWidth = 200f;
+	float worldHeight = 200f;
+	float screenWidth;
+	float screenHeight;
+	float tpX;
+	float tpY;
+
+	SpriteBatch batch;
+	OrthographicCamera camera;
+	ExtendViewport viewport;
+
+	Zombie zombie;
+	Line2D.Float tpRay;
 
 	@Override
 	public void create () {
-		
+
+		//World
 		Box2D.init();
 		
 		loader = new BodyEditorLoader(Gdx.files.internal("BodyColliders.json"));
-		
+		structureLoader = new BodyEditorLoader(Gdx.files.internal("Structures.json"));
 		world = new World(new Vector2(0,0),true);
-		
 		world.setContactListener(this);
-		
-		effect = new ParticleEffect();
-		
-		effect.load(Gdx.files.internal("Particles/bleed.p"), Gdx.files.internal("Particles"));
 
-		effect.flipY();
+		activeBullets = new ArrayList<>();
+		deadEntities = new ArrayList<>();
+		//toBeDestroyed = new Array();
+		worldStructures = new ArrayList<>();
+		tpIntersections = new HashMap<>();
 
+		//Renderers
 		debugRenderer = new Box2DDebugRenderer();
-		
+		shapeRenderer = new ShapeRenderer();
 		textureAtlas = new TextureAtlas("Sprites.txt");
 
 		UI = new TextureAtlas("UI/UI.txt");
 
-		batch = new SpriteBatch();
-		
-		camera = new OrthographicCamera();
-
-		camera.setToOrtho(true);
-
-		camera.zoom = 1;
-
-        viewport = new ExtendViewport(800, 600, camera);
-
         Gdx.input.setInputProcessor(this);
         
         addSprites();
-        
-        player = new Player(sprites,world,loader);
 
-		horde = new ArrayList<>();
+        init_Game_Objects();
+        render_Health_Bar();
+		init_Lighting();
+        init_Particle_Effects();
+        Vector2 playerDir = player.mam.currentDir;
+		float tpX2 = player.x + (playerDir.x * 60);
+		float tpY2 = player.y + (playerDir.y * 60);
+        tpRay = new Line2D.Float(player.x,player.y,tpX2,tpY2);
 
-        for (int i =0; i<10; i++) {
+		//Rendering and camera
+		batch = new SpriteBatch();
+		camera = new OrthographicCamera();
+		screenWidth = Gdx.graphics.getWidth();
+		screenHeight = Gdx.graphics.getHeight();
+		camera.setToOrtho(true,worldHeight * (screenWidth/screenHeight), worldHeight);
+		worldWidth = camera.viewportWidth;
+		//Initialize structures and screen borders
+		demo = new Structure(50,50,world,structureLoader,1);
+		demo1 = new Structure(160,20,world,structureLoader,2);
+		demo2 = new Structure(0,120,world,structureLoader,3);
+		demo3 = new Structure(150,130,world,structureLoader,4);
+		boundaries = new Structure(setScreenBorders(Gdx.graphics.getWidth(),Gdx.graphics.getHeight()));
+		//Since there is only on element, which represents my screen borders as an array of vectors
+		currentBoundaries = setScreenBorders(Gdx.graphics.getWidth(),Gdx.graphics.getHeight()).get(0);
+		worldStructures.add(demo);
+		worldStructures.add(demo1);
+		worldStructures.add(demo2);
+		worldStructures.add(demo3);
+		worldStructures.add(boundaries);
 
-			horde.add(new Zombie(sprites, world, loader));
+		//From those sturctures cast a ray towards each of their unique points
+		rays = new ArrayList<>();
+		for (Structure s : worldStructures)
+		{
+			for (Vector2 point : s.getUniquePoints())
+			{
+				rays.add(new Line2D.Float(player.x,player.y,point.x,point.y));
+			}
+			//Get the slightly rotated points
+			for (Vector2 v : s.getOffsetPoints(player))
+			{
+				rays.add(new Line2D.Float(player.x,player.y,v.x,v.y));
+			}
 		}
-        
-        bulletPool  = new Pool<Bullet>()
-    	{
 
-    		@Override
-    		protected Bullet newObject() {
-    			
-    			return new Bullet(sprites, world, player, loader);
-    		}
-    		
+		//Create walls (So that things dont fly off)
+		createWall(world,worldWidth+10,0,10,worldHeight);
+		createWall(world,0,-10,worldWidth,10);
+		createWall(world,-10,0,10,worldHeight);
+		createWall(world,10,worldHeight+10,worldWidth,10);
 
 
-    	};
-        
-         magazine = new BulletManager(sprites,player,world);
-
-         //HealthBar
-		 minusHealth = UI.createSprite("MinusHealth");
-		 minusHealth.setPosition(85,-91);
-
-		 health = UI.createSprite("HealthBar");
-		 health.setPosition(-75,-100);
+		polyBatch = new PolygonSpriteBatch();
+		pix = new Pixmap(1,1,Pixmap.Format.RGBA8888);
+		pix.setColor(0xDEDEDEFF);
+		pix.fill();
+		textureSolid = new Texture(pix);
+		triangulator = new EarClippingTriangulator();
 
 	}
 
+	public ArrayList<Vector2[]> setScreenBorders(float screenWidth, float screenHeight)
+	{
+		camera.update();
+
+		Vector3 topLeftW = camera.unproject(new Vector3(0,0,0));
+		System.out.println("TopLeft: "+topLeftW);
+
+		Vector3 bottomLeftW = camera.unproject(new Vector3(0,screenHeight,0));
+		System.out.println("BottomLeft: "+bottomLeftW);
+
+		Vector3 bottomRightW = camera.unproject(new Vector3(screenWidth,screenHeight,0));
+		System.out.println("BottomRight: "+bottomRightW);
+
+		Vector3 topRightW = camera.unproject(new Vector3(screenWidth,0,0));
+		System.out.println("TopRight: "+topRightW);
+
+		ArrayList<Vector2[]> borderShape = new ArrayList<>();
+		Vector2[] borderVectors = new Vector2[4];
+		borderVectors[0] = new Vector2(topLeftW.x,topLeftW.y);
+		borderVectors[1] = new Vector2(bottomLeftW.x,bottomLeftW.y);
+		borderVectors[2] = new Vector2(bottomRightW.x,bottomRightW.y);
+		borderVectors[3] = new Vector2(topRightW.x,topRightW.y);
+		borderShape.add(borderVectors);
+		return  borderShape;
+	}
+
+
+	public void init_Lighting()
+	{
+		rayHandler = new RayHandler(world);
+		light = new PointLight(rayHandler,100,new Color(1,1,1,1),100,0,0);
+		light.setSoftnessLength(0f);
+		light.attachToBody(player.body);
+	}
+
+	public void update_Lights()
+	{
+		light.setPosition(player.body.getPosition().x-10,player.body.getPosition().y-10);
+
+	}
+
+	public void init_Particle_Effects()
+	{
+		effect = new ParticleEffect();
+		effect.load(Gdx.files.internal("Particles/bleed.p"), Gdx.files.internal("Particles"));
+		effect.flipY();
+	}
+
+	public void init_Game_Objects()
+	{
+		horde = new ArrayList<>();
+
+		for (int i =0; i<15; i++) {
+
+			horde.add(new Zombie(sprites, world, loader,player));
+		}
+		player = new Player(sprites,world,loader,horde);
+		bulletPool  = new Pool<Bullet>()
+		{
+			@Override
+			protected Bullet newObject() {
+				return new Bullet(sprites, world, player,player.mam.bulletVel, loader);
+			}
+		};
+	}
+
+	public void render_Health_Bar()
+	{
+		minusHealth = UI.createSprite("MinusHealth");
+		minusHealth.setPosition(85,-91);
+
+		health = UI.createSprite("HealthBar");
+		health.setPosition(-75,-100);
+	}
+
+	public void updateTpRayPos()
+	{
+		Vector2 playerDir = player.mam.currentDir;
+		float tpX2 = player.x + (playerDir.x * 60);
+		float tpY2 = player.y + (playerDir.y * 60);
+		tpRay.x1 = player.x;
+		tpRay.y1 = player.y;
+		tpRay.x2 = tpX2;
+		tpRay.y2 = tpY2;
+
+	}
+	public void updateTeleport(Map<Float,PointOfIntersection> allIntersections, ShapeRenderer shapeRenderer)
+	{
+		//Given an map of intersections, sort the keys of the given map in order to
+		//find the furthest point of intersection within the line range
+		//Update the available coordinates for "teleportation" using that
+		Float[] sortedIntersections = allIntersections.keySet().toArray(new Float[0]);
+		Arrays.sort(sortedIntersections);
+		int counter =0;
+		for (int i = sortedIntersections.length-1 ; i >= 0; i--)
+		{
+			PointOfIntersection tpSpot = allIntersections.get(sortedIntersections[i]);
+			Vector2 lineV = new Vector2(tpRay.x2 - tpRay.x1,tpRay.y2 - tpRay.y1);
+			Vector2 pointV = new Vector2(tpSpot.pointOfIntersection.x - player.x,tpSpot.pointOfIntersection.y - player.y);
+			float lineLength = getLengthOf(lineV.x,lineV.y);
+			float pointLength = getLengthOf(pointV.x,pointV.y);
+
+			if (pointLength < lineLength)
+			{
+				tpX = tpSpot.pointOfIntersection.x;
+				tpY = tpSpot.pointOfIntersection.y;
+				allowedToTP = true;
+                counter++;
+				break;
+			}
+		}
+		//Because we know that the end segements of our world will count as an intersection,
+        //and we do not want to tp the player there, looking for length will prevent it from
+        //getting counted as a length
+		if (counter == sortedIntersections.length)
+        {
+            allowedToTP = false;
+        }
+		if (tpEngaged && allowedToTP) {
+			shapeRenderer.circle(tpX, tpY, 5);
+		}
+
+	}
+
+	public void teleportPlayer()
+	{
+	    if (allowedToTP) {
+            Vector2 transform = new Vector2(tpX, tpY);
+            player.setPosition(transform);
+        }
+	}
 
 	public void shotgunBaby(int bulletNumb)
 	{
 		//Grab my two end vectors
 		Vector2 v1 = player.shotGunVectors.get(0);
 		Vector2 v2 = player.shotGunVectors.get(1);
-
 		//find the length of those vectors
 		float unitV1 =  (float) Math.sqrt(Math.pow(v1.x,2)+ Math.pow(v1.y,2));
 		float unitV2 =  (float) Math.sqrt(Math.pow(v2.x,2)+ Math.pow(v2.y,2));
-
 		//Make two unit vectors
 		Vector2 newV1 = new Vector2(v1.x /unitV1, v1.y / unitV1);
 		Vector2 newV2 = new Vector2(v2.x / unitV2, v2.y / unitV2);
-
 		//Calculate dot product
-
 		float DP = (newV1.x * newV2.x) + (newV1.y * newV2.y);
-
 		//Determine the angles
 		float availableAngle = (float) Math.acos(DP);
 
@@ -199,22 +369,17 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 					Vector2 bulletDir = new Vector2(newX, newY);
 
 					Bullet item = bulletPool.obtain();
-					item.resetBulletVals(player.mam.mBody.getPosition(), player.mam.bulletVel, player.mam.mBody.getAngle());
-					item.setDir(bulletDir);
+					item.alive = true;
+					item.resetBulletVals(player.mam.spriteRelativeVector, bulletDir, player.mam.mBody.getAngle(),20);
 					activeBullets.add(item);
-
 				}
 
 			}else {
 				for (int i=0; i<2; i++) {
 					Bullet item = bulletPool.obtain();
-
 					item.alive = true;
-
-					item.resetBulletVals(player.mam.mBody.getPosition(), player.mam.bulletVel, player.mam.mBody.getAngle());
-
+					item.resetBulletVals(player.mam.mBody.getPosition(), player.mam.bulletVel, player.mam.mBody.getAngle(),30);
 					item.setDir(player.shotGunVectors.get(i));
-
 					activeBullets.add(item);
 				}
 			}
@@ -224,134 +389,296 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	public void spawnBullets()
 	{
-
 		Bullet item = bulletPool.obtain();
-
 		item.alive = true;
-
-		item.resetBulletVals(player.mam.mBody.getPosition(),player.mam.bulletVel, player.mam.mBody.getAngle());
-
-		//System.out.println("("+player.x+","+player.y+")"+"/"+"("+item.x+","+item.y+")");
-
+		item.resetBulletVals(player.mam.spriteRelativeVector,player.mam.bulletVel, player.mam.mBody.getAngle(),120);
 		activeBullets.add(item);
-
-		
 	}
 
 	@Override
 	public void render () {
- 
-	     
-	     //cameraUpdate();
-		 
-		
-		 Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
-	     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-	     
-	     checkInput(); 
-	  
-	     batch.begin();
-	     if(horde != null)
-		 {
-			 for (Zombie z : horde)
-			 {
-				z.updateZombie(batch,player);
-			 }
-	     }
-	     player.updatePlayer(batch);
-	     
-	     for(Bullet bullet : activeBullets)
-	     {
-	    	 
-	    	 
-	    	 bullet.updateBullet(batch);
-
-	    	 
-	     }
-	     
-	     effect.update(Gdx.graphics.getDeltaTime());
-	     
-	     effect.draw(batch);
-
-		 minusHealth.draw(batch);
-
-	     health.draw(batch);
-
-	     drawSprite(health);
-	     
-	     batch.end();
-	     
-	     debugRenderer.render(world,camera.combined);
-	     
-	     world.step(1/120f, 6, 2);
-
-	}
-	
-	
-	public void cameraUpdate()
-	{
-		Vector3 position = camera.position;
-		position.x = player.sprite.getX();
-		position.y = player.sprite.getY();
-		
-		camera.position.set(position);
-
+		Gdx.gl.glClearColor(0, 0, 0, 0);
+		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+		//Update Camera, Check input, RenderShapes and world
 		camera.update();
+		checkInput();
+		renderShapesAndWorld();
+		//Draw player and zombie whiel updating camera pos
+		batch.setProjectionMatrix(camera.combined);
+		batch.begin();
+		if (player.alive) {
+            player.updatePlayer(batch);
 
+            if (player.isDashing) {
+                updateCameraPos(2f);
+            } else {
+                updateCameraPos(5f);
+            }
+
+        }else{
+		    deadEntities.add(player);
+		    BitmapFont gameOverText = new BitmapFont(true);
+		    gameOverText.draw(batch,"Dead X.X",worldWidth/2,worldHeight/2);
+
+        }
+        for (Zombie z: horde)
+        {
+            if (z.alive) {
+                z.updateZombie(batch, player);
+            }else {
+                deadEntities.add(z);
+            }
+        }
+        //Render bullet if alive, else, reset it and remove it from the array
+		//while adding it in the list of bodies to be destroyed
+        for (Bullet bullet: activeBullets)
+        {
+        	if (bullet.alive) {
+				bullet.updateBullet(batch);
+			}else
+			{
+				//bullet.reset();
+				deadEntities.add(bullet);
+				//bulletPool.free(bullet);
+			}
+        }
+		for (Entity e : deadEntities)
+		{
+			if (e.getType() == Constants.BULLET_TYPE) {
+				bulletPool.free((Bullet) e);
+				activeBullets.remove(e);
+			}
+			e.getBody().setActive(false);
+		}
+		deadEntities.clear();
+        batch.end();
+		world.step(1/120f, 6, 2);
+		debugRenderer.render(world, camera.combined);
 	}
-	
-	public void checkInput()
+
+	public void renderShapesAndWorld()
 	{
-
-		if(Gdx.input.isKeyPressed(Keys.W))
+		shapeRenderer.setProjectionMatrix(camera.combined);
+		shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+		updateRays();
+		if (tpEngaged)
 		{
-
-			player.setDir(0,-5);
-			player.mam.updateMam();
+			updateTpRayPos();
 		}
-		if(Gdx.input.isKeyPressed(Keys.S))
+		//Render my stuctues
+		for (Structure s : worldStructures)
 		{
-			player.setDir(0,5);
-			player.mam.updateMam();
+			for (Vector2[] polygon : s.polygonList)
+			{
+				float[] vertices = s.getPolygonVectors(polygon);
+				shapeRenderer.polygon(vertices);
+			}
 		}
-		if(Gdx.input.isKeyPressed(Keys.A))
+		//Re-initiate my array
+		rayAngles = new float[rays.size()];
+		rayPolygon = new float[rays.size()*2];
+		//Go through each of my rays, calculate their angle and point of intersection, put the latter in a Map
+		//Go through the keyset of my map (T1 values) and find which ray is the closest
+		//render a ray according to that point of intersection's values
+		Map<Float,PointOfIntersection> angleMap = new HashMap<>();
+		for (Line2D.Float ray : rays)
 		{
+			float x2 = 0f;
+			float y2 = 0f;
 
-			player.setDir(-5,0);
-			player.mam.updateMam();
-			
+			Map<Float,PointOfIntersection> closestMap =new HashMap<Float,PointOfIntersection>();
+			for(Structure structure : worldStructures) {
+				for (Line2D.Float[] segments : structure.getBodySegments()) {
+					for (int i = 0; i < segments.length; i++) {
+						PointOfIntersection currentInt = getIntersection(ray, segments[i]);
+						if (currentInt != null) {
+							closestMap.put(currentInt.T1, currentInt);
+						}
+						//If we press ctrl and the tp Line appears, calculate intersections with segements
+						//Check in index of the ray first so that this only runs once ;)
+						if (tpEngaged && rays.indexOf(ray) == 0){
+							PointOfIntersection tpInt = getIntersection(tpRay,segments[i]);
+							if (tpInt != null) {
+								tpIntersections.put(tpInt.T1, tpInt);
+							}
+						}
+					}
+
+				}
+			}
+
+			Float[] allPoints = closestMap.keySet().toArray(new Float[0]);
+			if (allPoints.length > 0) {
+				float closestPoint = allPoints[0];
+				for (int i = 0; i < allPoints.length; i++) {
+					if(allPoints[i]<closestPoint)
+					{
+						closestPoint = allPoints[i];
+					}
+				}
+				PointOfIntersection closestIntersection = closestMap.get(closestPoint);
+                x2 = closestIntersection.pointOfIntersection.x;
+                y2 = closestIntersection.pointOfIntersection.y;
+
+                Vector2 rV = new Vector2(x2-player.getPos().x,y2-player.getPos().y);
+                float angle = (float) Math.atan2(rV.y,rV.x);
+
+				int index = rays.indexOf(ray);
+				rayAngles[index] = angle;
+				angleMap.put(rayAngles[index],closestIntersection);
+			}
+			shapeRenderer.line(ray.x1,ray.y1,x2,y2);
+			for (Zombie z : horde)
+			{
+				shapeRenderer.polygon(z.getPolygonVectors(z.scaledShapeVertices));
+			}
 		}
-		if(Gdx.input.isKeyPressed(Keys.D))
-		{
-
-			player.setDir(5,0);
-			player.mam.updateMam();
-		}
-		if (Gdx.input.isKeyPressed(Keys.C))
-		{
-
-			shotgunCounter++;
-
-
+		updateTeleport(tpIntersections,shapeRenderer);
+		tpIntersections.clear();
+		if(tpEngaged) {
+			shapeRenderer.line(tpRay.x1, tpRay.y1, tpRay.x2, tpRay.y2);
 		}
 
-	
-		
+		//Sort angles, Make a polygon according to those sorted angles and their point of intersection
+		//Lets me connect said polygon clockwise
+		Arrays.sort(rayAngles);
+		for (int i = 0, j = 0; i < rayAngles.length; i++, j += 2) {
+			PointOfIntersection point = angleMap.get(rayAngles[i]);
+			rayPolygon[j] = point.pointOfIntersection.x;
+			rayPolygon[j + 1] = point.pointOfIntersection.y;
+		}
+
+		//Check if zombie and polygon are overlapping
+		for (Zombie z: horde) {
+			FloatArray zombiePolygon = new FloatArray(z.getPolygonVectors(z.scaledShapeVertices));
+			FloatArray rPolygon = new FloatArray(rayPolygon);
+			if(Intersector.intersectPolygons(rPolygon,zombiePolygon))
+			{
+				z.spotPlayer = true;
+			}
+			else
+			{
+				z.spotPlayer = false;
+			}
+		}
+		shapeRenderer.end();
+		//Initialize my Region, texture and batch to render the polygon.
+		if (gameLightOn) {
+			polyReg = new PolygonRegion(new TextureRegion(textureSolid), rayPolygon, triangulator.computeTriangles(rayPolygon).toArray());
+
+			poly = new PolygonSprite(polyReg);
+			poly.setOrigin(0, 0);
+			polyBatch = new PolygonSpriteBatch();
+			polyBatch.setProjectionMatrix(camera.combined);
+			polyBatch.begin();
+			poly.draw(polyBatch);
+			polyBatch.end();
+		}
+
 	}
-	public void drawSprite(String name, float x, float y)
+
+	public Vector2[] getLineVectors(Line2D.Float line)
 	{
-		Sprite sprite = sprites.get(name);
-		
-		sprite.setPosition(x, y);
-		sprite.draw(batch);
-		
+		Vector2[] points = new Vector2[2];
+		points[0] = new Vector2(line.x1,line.y1);
+		points[1] = new Vector2(line.x2,line.y2);
+
+		return points;
+
 	}
-	
-	public void drawSprite(Sprite sprite)
+
+	public void createWall(World world,float x, float y, float width, float height) {
+		BodyDef wallDef = new BodyDef();
+		wallDef.position.set(x, y);
+		Body wallBody = world.createBody(wallDef);
+
+		PolygonShape wallShape = new PolygonShape();
+		wallShape.setAsBox(width, height);
+		wallBody.createFixture(wallShape, 0.0f);
+		wallShape.dispose();
+	}
+
+	public void updateCameraPos(float increment)
 	{
-		
-		sprite.draw(batch);
+		float lerp = increment;
+		Vector3 position = camera.position;
+		position.x += (player.getPos().x - position.x) * lerp * Gdx.graphics.getDeltaTime();
+		position.y += (player.getPos().y - position.y) * lerp * Gdx.graphics.getDeltaTime();
+		camera.position.set(position);
+		camera.update();
 	}
+
+	public void toggleGameLight()
+	{
+		if (gameLightOn)
+		{
+			gameLightOn = false;
+		}
+		else
+		{
+			gameLightOn = true;
+		}
+	}
+
+	public void updateRays()
+	{
+		for (Line2D.Float ray : rays)
+		{
+			ray.x1 = player.getPos().x;
+			ray.y1 = player.getPos().y;
+		}
+	}
+
+
+
+	public PointOfIntersection getIntersection(Line2D.Float ray, Line2D.Float segment)
+	{
+		float r_px = ray.x1;
+		float r_py = ray.y1;
+		float r_dx = ray.x2 - ray.x1;
+		float r_dy = ray.y2 - ray.y1;
+
+		float s_px = segment.x1;
+		float s_py = segment.y1;
+		float s_dx = segment.x2 - segment.x1;
+		float s_dy = segment.y2 - segment.y1;
+
+		//If parallel, they do not intersect
+		Vector2 rayDirection = new Vector2(r_dx,r_dy);
+		Vector2 segmentDirection = new Vector2(s_dx,s_dy);
+
+		float rayVectorLength = (float) Math.sqrt(Math.pow(rayDirection.x,2) + Math.pow(rayDirection.y,2));
+		float segmentVectorLength = (float) Math.sqrt(Math.pow(segmentDirection.x,2) + Math.pow(segmentDirection.y,2));
+
+		Vector2 rayUVector = new Vector2(rayDirection.x/rayVectorLength,rayDirection.y/rayVectorLength);
+		Vector2 segmentUVector = new Vector2(segmentDirection.x/segmentVectorLength,segmentDirection.y/segmentVectorLength);
+
+		if (rayUVector.x == segmentUVector.x && rayUVector.y == segmentUVector.y)
+		{
+			return null;
+
+		}else {
+			//Since they are intersecting, their x and y value at (t) will be the same
+
+			float T2 = (r_dx*(s_py - r_py) + r_dy*(r_px - s_px))/(s_dx*r_dy - s_dy*r_dx);
+			float T1 = (s_px + s_dx*T2-r_px)/r_dx;
+
+			if (T1<0)
+				return null;
+			else if(T2<0 || T2>1)
+				return null;
+			else {
+
+				Vector2 pointOfIntersection = new Vector2(r_px + r_dx * T1, r_py + r_dy * T1);
+
+				return new PointOfIntersection(pointOfIntersection,T1);
+			}
+		}
+
+
+
+	}
+
 	
 	
 	public void addSprites()
@@ -372,26 +699,78 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	
 	@Override
 	public void resize(int width, int height) {
-		
-	    viewport.update(width, height, true);
 
-	    batch.setProjectionMatrix(camera.combined);
+		float screenWidth = Gdx.graphics.getWidth();
+		float screenHeight = Gdx.graphics.getHeight();
+		camera.viewportWidth = worldHeight * (screenWidth/screenHeight);
+		worldWidth = camera.viewportWidth;
+		camera.viewportHeight = worldHeight;
+
+		//On resize remove the current border rays
+		ArrayList<Line2D.Float> oldBorders = new ArrayList<>();
+		for (Line2D.Float ray : rays)
+		{
+			Vector2 rayV = new Vector2(ray.x2,ray.y2);
+			for (Vector2 initialPoint : currentBoundaries) {
+				if (rayV.equals(initialPoint))
+				{
+					oldBorders.add(ray);
+				}
+			}
+		}
+		rays.removeAll(oldBorders);
+		//Update the border segements
+		boundaries.updateSegements(setScreenBorders(width,height));
+		//Add new Vectors for new segments
+		for (Vector2 newBound : boundaries.getUniquePoints())
+		{
+			rays.add(new Line2D.Float(player.getPos().x,player.getPos().y,newBound.x,newBound.y));
+		}
+		//update the current borders
+		currentBoundaries = setScreenBorders(width,height).get(0);
+
 	}
 	
 	@Override
 	public void dispose () {
-		
 		textureAtlas.dispose();
-		
+		rayHandler.dispose();
 		sprites.clear();
-
-		magazine.ll.clear();
-		magazine.sprites.clear();
 		debugRenderer.dispose();
 		world.dispose();
-		
 	}
 
+	public void checkInput()
+	{
+		if (!player.isDashing) {
+			if (Gdx.input.isKeyPressed(Keys.W)) {
+				player.body.setLinearVelocity(0, -150);
+				player.mam.updateMam();
+			}
+			if (Gdx.input.isKeyPressed(Keys.S)) {
+				player.body.setLinearVelocity(0, 150);
+				player.mam.updateMam();
+			}
+			if (Gdx.input.isKeyPressed(Keys.A)) {
+				player.body.setLinearVelocity(-150, 0);
+				player.mam.updateMam();
+			}
+			if (Gdx.input.isKeyPressed(Keys.D)) {
+				player.body.setLinearVelocity(150, 0);
+				player.mam.updateMam();
+			}
+			if (Gdx.input.isKeyPressed(Keys.C)) {
+				//shotgunCounter++;
+			}
+			if (Gdx.input.isKeyPressed(Keys.CONTROL_LEFT))
+			{
+				tpEngaged = true;
+			}else
+			{
+				tpEngaged = false;
+			}
+		}
+	}
 	
 	//KeyBoard Input
 	@Override
@@ -410,19 +789,19 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		{}
 		if (keycode == Keys.SPACE)
 		{
-
 			player.isDashing = true;
-
 		}
 		if (keycode == Keys.SHIFT_LEFT)
 		{
 			itemSelect++;
-
 			if (itemSelect > 2)
 			{
 				itemSelect =1;
 			}
-
+		}
+		if (keycode == Keys.C)
+		{
+			toggleGameLight();
 		}
 		
 		return false;
@@ -430,35 +809,23 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	@Override
 	public boolean keyUp(int keycode) {
-		if(keycode == Keys.W)
-		{
-			player.setDir(0,0);
-
-			
-		}
-		if(keycode == Keys.S)
-		{
-			player.setDir(0,0);
-
-		}
-		if(keycode == Keys.A)
-		{
-
-			player.setDir(0,0);
-
-			
-		}
-		if(keycode == Keys.D)
-		{
-
-			player.setDir(0,0);
-
-			
-		}
-
-		if (keycode == Keys.SPACE)
-		{
-			player.energy = 100;
+		if (!player.isDashing) {
+			if (keycode == Keys.W) {
+				player.body.setLinearVelocity(0, 0);
+				player.body.setAngularVelocity(0);
+			}
+			if (keycode == Keys.S) {
+				player.body.setLinearVelocity(0, 0);
+				player.body.setAngularVelocity(0);
+			}
+			if (keycode == Keys.A) {
+				player.body.setLinearVelocity(0, 0);
+				player.body.setAngularVelocity(0);
+			}
+			if (keycode == Keys.D) {
+				player.body.setLinearVelocity(0, 0);
+				player.body.setAngularVelocity(0);
+			}
 
 		}
 		return false;
@@ -470,13 +837,14 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button){
 
-		if (itemSelect == 1) {
-			spawnBullets();
-		}
-		else
-		{
-
-			shotgunBaby(5);
+		if (!tpEngaged) {
+			if (itemSelect == 1) {
+				spawnBullets();
+			} else {
+				shotgunBaby(10);
+			}
+		}else{
+			teleportPlayer();
 		}
 
 		return false;
@@ -488,34 +856,32 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {return false;}
 
-
+	//TODO: FIX the ray movement
 	@Override
 	public boolean mouseMoved(int screenX, int screenY) {
+        if (player.alive) {
+            Vector3 mouseScreen = new Vector3(screenX, screenY, 0);
+            Vector3 mouseWorld = camera.unproject(mouseScreen);
+            Vector2 relativeMousePos = new Vector2(mouseWorld.x - player.getPos().x, mouseWorld.y - player.getPos().y);
+            float mouseLength = (float) Math.sqrt(Math.pow(relativeMousePos.x, 2) + Math.pow(relativeMousePos.y, 2));
+            Vector2 mouseVec = new Vector2(relativeMousePos.x / mouseLength, relativeMousePos.y / mouseLength);
 
-		float weirdOffset = 70;
-//
-		Vector2 mousePos = new Vector2(screenX,screenY);
-//
-		Vector2 relativeMousePos = new Vector2( (screenX-weirdOffset) - player.sprite.getX(), screenY - player.sprite.getY());
-//
-		float mouseLength = (float) Math.sqrt(Math.pow(relativeMousePos.x,2) + Math.pow(relativeMousePos.y,2));
-//
-		Vector2 mouseVec = new Vector2(relativeMousePos.x/mouseLength,relativeMousePos.y/mouseLength);
-//
-		Vector2 playerVec = new Vector2(player.mam.initialVector.x/player.mam.length,player.mam.initialVector.y/player.mam.length);
-//
-//		//THis time we have to calculate the dot product, and the determinant
-		float DP = (playerVec.x * mouseVec.x) + (playerVec.y * mouseVec.y);
-//
-		float DE = (playerVec.x * mouseVec.y) - (playerVec.y * mouseVec.x);
-//
-		float angle = (float) Math.atan2(DE,DP);
-//
-		player.sprite.setRotation(MathUtils.radiansToDegrees * angle);
-//
-		player.mam.updateMam();
+            Vector2 initialPlayerV = new Vector2(0, 1);
 
+            float DP = (mouseVec.x * initialPlayerV.x) + (mouseVec.y * initialPlayerV.y);
+            float DE = (mouseVec.x * initialPlayerV.y) - (mouseVec.y * initialPlayerV.x);
+            float angle = (float) Math.atan2(DE, DP);
+
+            player.body.setTransform(player.body.getPosition(), -angle);
+            player.mam.updateMam();
+        }
 		return false;
+	}
+
+	public float getLengthOf(float vectorX, float vectorY)
+	{
+		float length = (float) Math.sqrt(Math.pow(vectorX,2)+Math.pow(vectorY,2));
+		return length;
 	}
 
 	@Override
@@ -526,85 +892,12 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	//ContactListener Stuff
 	@Override
 	public void beginContact(Contact contact) {
-
-		
-		Fixture fixA = contact.getFixtureA();
-		Fixture fixB = contact.getFixtureB();
-		
-		int cDef = fixA.getFilterData().categoryBits | fixB.getFilterData().categoryBits;
-		
-		switch(cDef)
+		Entity e1 = (Entity) contact.getFixtureA().getBody().getUserData();
+		Entity e2 = (Entity) contact.getFixtureB().getBody().getUserData();
+		if (e1 != null)
 		{
-		case xZOMBIE | xBULLET:
-			
-			if(fixA.getBody().getUserData() instanceof Zombie)
-			{
-
-				Zombie zombie = (Zombie) fixA.getBody().getUserData();
-
-				Bullet bullet =  (Bullet) fixB.getBody().getUserData();
-
-				Vector2 pushDir = bullet.getDir();
-
-				zombie.x += pushDir.x;
-				zombie.y += pushDir.y;
-
-				zombie.Health -= 10;
-
-				if (zombie.Health <= 0)
-				{
-					zombie.alive = false;
-				}
-				
-				effect.setPosition(bullet.x+(Constants.PPM/2), bullet.y+(Constants.PPM/2));
-				
-				effect.setDuration(1);
-				
-				for(int i =0; i<effect.getEmitters().size; i++)
-				{
-					
-					effect.getEmitters().get(i).getWind().setHigh((-1 * pushDir.x)*200);
-//					effect.getEmitters().get(i).getGravity().setHigh(value);
-//					effect.getEmitters().get(i).getGravity().setLow(value);
-				}
-				
-		        effect.start();
-				
-				bullet.alive = false;
-			
-		    	activeBullets.remove(bullet);
-		    	bulletPool.free(bullet);
-				
-			
-		    }
-
-			case xZOMBIE | xPLAYER:
-
-				if (fixA.getBody().getUserData() instanceof  Player)
-				{
-
-					if (!player.isDashing) {
-						counter++;
-						health.setPosition(health.getX() - 40, health.getY());
-						if (health.getX() == -355) {
-							System.out.println("Player Dead X.X");
-						}
-
-					}else if (fixB.getBody().getUserData() instanceof Zombie)
-					{
-						Zombie zombie = (Zombie) fixB.getBody().getUserData();
-						zombie.setDir(player.mam.currentDir.x,player.mam.currentDir.y);
-
-					}
-				}
-
-		    	    
+			e1.checkCollision(e2);
 		}
-		
-		
-		
-
-		
 	}
 
 	@Override
@@ -623,5 +916,17 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	public void postSolve(Contact contact, ContactImpulse impulse) {
 		// TODO Auto-generated method stub
 		
+	}
+
+	class PointOfIntersection
+	{
+		Vector2 pointOfIntersection;
+		float T1;
+		public PointOfIntersection(Vector2 POI, float T1)
+		{
+			this.pointOfIntersection = POI;
+			this.T1 = T1;
+		}
+
 	}
 }
