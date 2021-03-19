@@ -1,6 +1,6 @@
 # Protozoid
 
-A fun littlejava game with zombies and bullets!
+A fun little java game with zombies and bullets!
 
 DEMO
 
@@ -15,7 +15,7 @@ DEMO
 
 -Use **(SHIFT)** to switch from your regular pistol to a wider spread shot-gun!
 
--If cornered, press **(SPACE)** TO DASH.
+-If cornered, press **(SPACE)** to dash.
 
 -And most importantly, use **(LEFT CONTROL + LEFT CLICK)** in order to teleport from any Structure for a fast counter-attack.
 
