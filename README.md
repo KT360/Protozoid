@@ -3,6 +3,6 @@
 A fun littlejava game with zombies and bullets!
 
 DEMO
+[![Demo CountPages alpha](https://share.gifyoutube.com/KzB6Gb.gif)](https://www.youtube.com/watch?v=ek1j272iAmc)
 
-<iframe src='//gifs.com/embed/kt360-GvPYm8' frameborder='0' scrolling='no' width='280px' height='360px' style='-webkit-backface-visibility: hidden;-webkit-transform: scale(1);' ></iframe>
 
