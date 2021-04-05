@@ -2,7 +2,7 @@
 
 A fun little java game with zombies and bullets!
 
-DEMO
+DEMO:V1.0
 
 
 [![Demo CountPages alpha](https://j.gifs.com/GvPYm8.gif)](https://www.youtube.com/watch?v=ek1j272iAmc)
