@@ -11,8 +11,10 @@ import box2dLight.PointLight;
 import box2dLight.RayHandler;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.*;
@@ -39,23 +41,9 @@ import javax.swing.*;
 public class ZombieMania extends ApplicationAdapter implements InputProcessor,ContactListener{
 	
 	TextureAtlas textureAtlas;
-
-    static final float STEP_TIME = 1f / 60f;
-    static final int VELOCITY_ITERATIONS = 6;
-    static final int POSITION_ITERATIONS = 2;
-
-    public static final short xZOMBIE       = 0x0001;
-    public static final short xBULLET       = 0x0002;
-    public static final short xWALL         = 0x0004;
-    public static final short xPLAYER       = 0x0008; 
-    
-    public static final short PLAYER_MASK = xZOMBIE;
-    public static final short ZOMBIE_MASK = xPLAYER | xBULLET;
-    public static final short BULLET_MASK = xZOMBIE;
     
 	final HashMap<String, Sprite> sprites = new HashMap<String, Sprite>();
 
-	int shotgunCounter =0;
 
 	int itemSelect = 1;
 
@@ -73,9 +61,14 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	ArrayList<Bullet> activeBullets;
 	ArrayList<Entity> deadEntities;
 	//Array<Entity> toBeDestroyed;
+	Array<Body> walls;
 	ArrayList<Structure> worldStructures;
 	ArrayList<Zombie> horde;
 	Map<Float,PointOfIntersection> tpIntersections;
+
+	//MAP TEXTURES
+	TextureAtlas mapTextures;
+	Texture skyBox;
 
 	//RAY CASTING stuff
 	PolygonSprite poly;
@@ -93,8 +86,12 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	ParticleEffect effect;
 	TextureAtlas UI;
-	Sprite health;
-	Sprite minusHealth;
+	Texture healthBar;
+	Pixmap healthPix;
+	Texture healthDepleted;
+	Pixmap minusPix;
+//	Sprite health;
+//	Sprite minusHealth;
 	Structure demo;
 	Structure demo1;
 	Structure demo2;
@@ -103,12 +100,18 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	boolean gameLightOn = true;
 	boolean tpEngaged = false;
 	boolean allowedToTP = false;
-	float worldWidth = 200f;
-	float worldHeight = 200f;
+	boolean mouseDown = false;
+	boolean hasFinishedLevel = false;
+	public static boolean playerIsBuffed = false;
+	float worldWidth = 230f;
+	float worldHeight = 230f;
 	float screenWidth;
 	float screenHeight;
 	float tpX;
 	float tpY;
+	int timer = 100;
+	int bulletTimer = 10;
+	int zombieNumb = Constants.ZOMBIE_NUMB;
 
 	SpriteBatch batch;
 	OrthographicCamera camera;
@@ -116,9 +119,30 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	Zombie zombie;
 	Line2D.Float tpRay;
+	Chunk testMap;
+
+	TextureAtlas atlas_for_UI;
+	TextureRegion health_bar;
+	TextureRegion rifle;
+	TextureRegion rifle_selected;
+	TextureRegion shotgun;
+	TextureRegion shotgun_selected;
+	PolygonRegion healthReg;
+	PolygonRegion depletedHealthReg;
+	PolygonSpriteBatch UI_Batch;
+	Matrix4 screenMatrix;
+
+	Animator comboMeter;
+	Texture comboFrames;
+
+//	Sound rifleShot;
+//	Sound shotgunBlast;
+//	Sound bulletHit;
 
 	@Override
 	public void create () {
+
+		skyBox = new Texture(Gdx.files.internal("Sprites/SkyBox/SkyBox.png"));
 
 		//World
 		Box2D.init();
@@ -130,9 +154,10 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 		activeBullets = new ArrayList<>();
 		deadEntities = new ArrayList<>();
-		//toBeDestroyed = new Array();
+		walls = new Array<>();
 		worldStructures = new ArrayList<>();
 		tpIntersections = new HashMap<>();
+		mapTextures = new TextureAtlas("Sprites/Grass/Grass.txt");
 
 		//Renderers
 		debugRenderer = new Box2DDebugRenderer();
@@ -142,11 +167,12 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		UI = new TextureAtlas("UI/UI.txt");
 
         Gdx.input.setInputProcessor(this);
-        
-        addSprites();
+
+        addSprites(sprites, textureAtlas);
+
 
         init_Game_Objects();
-        render_Health_Bar();
+//        render_Health_Bar();
 		init_Lighting();
         init_Particle_Effects();
         Vector2 playerDir = player.mam.currentDir;
@@ -161,6 +187,10 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		screenHeight = Gdx.graphics.getHeight();
 		camera.setToOrtho(true,worldHeight * (screenWidth/screenHeight), worldHeight);
 		worldWidth = camera.viewportWidth;
+		testMap = new Chunk(worldWidth,worldHeight,mapTextures);
+		batch.setProjectionMatrix(camera.combined);
+		screenMatrix = new Matrix4(batch.getProjectionMatrix().setToOrtho2D(0,0,screenWidth,screenHeight));
+
 		//Initialize structures and screen borders
 		demo = new Structure(50,50,world,structureLoader,1);
 		demo1 = new Structure(160,20,world,structureLoader,2);
@@ -190,19 +220,101 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 			}
 		}
 
-		//Create walls (So that things dont fly off)
-		createWall(world,worldWidth+10,0,10,worldHeight);
-		createWall(world,0,-10,worldWidth,10);
-		createWall(world,-10,0,10,worldHeight);
-		createWall(world,10,worldHeight+10,worldWidth,10);
-
-
 		polyBatch = new PolygonSpriteBatch();
 		pix = new Pixmap(1,1,Pixmap.Format.RGBA8888);
-		pix.setColor(0xDEDEDEFF);
+		pix.setColor(0, 0.5f, 0,0.2f);
 		pix.fill();
 		textureSolid = new Texture(pix);
 		triangulator = new EarClippingTriangulator();
+
+		createUI();
+		//init_Sounds();
+
+	}
+
+	public void init_Sounds()
+	{
+//		rifleShot = Gdx.audio.newSound(Gdx.files.absolute("C:/Users/kamto/Downloads/Sounds/Rifle-Burst-Fire.mp3"));
+//		shotgunBlast = Gdx.audio.newSound(Gdx.files.absolute("Sounds/Shotgun.mp3"));
+//		bulletHit = Gdx.audio.newSound(Gdx.files.absolute("bullet-impact.mp3"));
+	}
+
+	public void createUI()
+	{
+		UI_Batch = new PolygonSpriteBatch();
+		//Create Healthbar
+		atlas_for_UI = new TextureAtlas(Gdx.files.internal("Sprites/GUI/UI.txt"));
+		health_bar = atlas_for_UI.findRegion("HEALTHBAR");
+		rifle = atlas_for_UI.findRegion("RIFLE");
+		rifle_selected = atlas_for_UI.findRegion("RIFLE_SELECTED");
+		shotgun = atlas_for_UI.findRegion("SHOTGUN");
+		shotgun_selected = atlas_for_UI.findRegion("SHOTGUN_SELECTED");
+
+		healthPix = new Pixmap(1,1,Pixmap.Format.RGBA8888);
+		healthPix.setColor(0,1,0,1);
+		healthPix.fill();
+
+		healthBar = new Texture(healthPix);
+
+		minusPix = new Pixmap(1,1,Pixmap.Format.RGBA8888);
+		minusPix.setColor(1,0,0,1);
+		minusPix.fill();
+
+		healthDepleted = new Texture(minusPix);
+
+		healthReg = new PolygonRegion(new TextureRegion(healthBar),new float[]{
+				0,0,
+				100,0,
+				15,15,
+				115,15
+		},new short[]{
+				0,2,3,
+				3,1,0
+		});
+
+		depletedHealthReg = new PolygonRegion(new TextureRegion(healthDepleted),new float[]{
+				0,0,
+				100,0,
+				15,15,
+				115,15
+		},new short[]{
+				0,2,3,
+				3,1,0
+		});
+
+		comboFrames = new Texture(Gdx.files.internal("Sprites/GUI/Combo_Meter.png"));
+		comboMeter = new Animator(comboFrames,3,3,1/24f,true);
+		for (TextureRegion t : comboMeter.animFrames)
+		{
+			t.flip(false,true);
+		}
+
+	}
+
+	public void placeWalls()
+	{
+		//Destroy previous walls
+		for (Body b : walls)
+		{
+			if (!world.isLocked())
+			{
+				world.destroyBody(b);
+			}
+		}
+		walls.clear();
+
+		if (worldWidth < 308) {
+			//Build new ones
+			createWall(world, worldWidth + 10, worldHeight / 2, 10, worldHeight / 2);
+			createWall(world, worldWidth / 2, -10, worldWidth / 2, 10);
+			createWall(world, -10, worldHeight / 2, 10, worldHeight / 2);
+			createWall(world, worldWidth / 2, worldHeight + 10, worldWidth / 2, 10);
+		}else{
+			createWall(world, 306 + 10, worldHeight / 2, 10, worldHeight / 2);
+			createWall(world, 306/ 2f, -10, 306/2f, 10);
+			createWall(world, -10, worldHeight / 2, 10, worldHeight / 2);
+			createWall(world, 306/2f, worldHeight + 10, 306/ 2f, 10);
+		}
 
 	}
 
@@ -210,24 +322,20 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	{
 		camera.update();
 
-		Vector3 topLeftW = camera.unproject(new Vector3(0,0,0));
-		System.out.println("TopLeft: "+topLeftW);
+		Vector2 topLeftW = new Vector2(0,0);
 
-		Vector3 bottomLeftW = camera.unproject(new Vector3(0,screenHeight,0));
-		System.out.println("BottomLeft: "+bottomLeftW);
+		Vector2 bottomLeftW =  new Vector2(0,worldHeight);
 
-		Vector3 bottomRightW = camera.unproject(new Vector3(screenWidth,screenHeight,0));
-		System.out.println("BottomRight: "+bottomRightW);
+		Vector2 bottomRightW = new Vector2(worldWidth,worldHeight);
 
-		Vector3 topRightW = camera.unproject(new Vector3(screenWidth,0,0));
-		System.out.println("TopRight: "+topRightW);
+		Vector2 topRightW = new Vector2(worldWidth,0);
 
 		ArrayList<Vector2[]> borderShape = new ArrayList<>();
 		Vector2[] borderVectors = new Vector2[4];
-		borderVectors[0] = new Vector2(topLeftW.x,topLeftW.y);
-		borderVectors[1] = new Vector2(bottomLeftW.x,bottomLeftW.y);
-		borderVectors[2] = new Vector2(bottomRightW.x,bottomRightW.y);
-		borderVectors[3] = new Vector2(topRightW.x,topRightW.y);
+		borderVectors[0] = topLeftW;
+		borderVectors[1] = bottomLeftW;
+		borderVectors[2] = bottomRightW;
+		borderVectors[3] = topRightW;
 		borderShape.add(borderVectors);
 		return  borderShape;
 	}
@@ -252,16 +360,22 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		effect = new ParticleEffect();
 		effect.load(Gdx.files.internal("Particles/bleed.p"), Gdx.files.internal("Particles"));
 		effect.flipY();
+		effect.scaleEffect(0.5f);
+		effect.start();
+	}
+	public void placeZombies()
+	{
+		zombieNumb+=2;
+		for (int i =0; i<zombieNumb; i++) {
+
+			horde.add(new Zombie(sprites, world, loader,player));
+		}
 	}
 
 	public void init_Game_Objects()
 	{
 		horde = new ArrayList<>();
-
-		for (int i =0; i<15; i++) {
-
-			horde.add(new Zombie(sprites, world, loader,player));
-		}
+		placeZombies();
 		player = new Player(sprites,world,loader,horde);
 		bulletPool  = new Pool<Bullet>()
 		{
@@ -272,14 +386,14 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		};
 	}
 
-	public void render_Health_Bar()
-	{
-		minusHealth = UI.createSprite("MinusHealth");
-		minusHealth.setPosition(85,-91);
-
-		health = UI.createSprite("HealthBar");
-		health.setPosition(-75,-100);
-	}
+//	public void render_Health_Bar()
+//	{
+//		minusHealth = UI.createSprite("MinusHealth");
+//		minusHealth.setPosition(85,-91);
+//
+//		health = UI.createSprite("HealthBar");
+//		health.setPosition(-75,-100);
+//	}
 
 	public void updateTpRayPos()
 	{
@@ -325,7 +439,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
             allowedToTP = false;
         }
 		if (tpEngaged && allowedToTP) {
-			shapeRenderer.circle(tpX, tpY, 5);
+			shapeRenderer.circle(tpX, tpY, 10);
 		}
 
 	}
@@ -393,42 +507,125 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		item.alive = true;
 		item.resetBulletVals(player.mam.spriteRelativeVector,player.mam.bulletVel, player.mam.mBody.getAngle(),120);
 		activeBullets.add(item);
+//		long id = rifleShot.play();
+//		rifleShot.setLooping(id,false);
+	}
+
+	public void resetGame()
+	{
+		placeZombies();
+
+		for (Zombie z : horde)
+		{
+			deadEntities.remove(z);
+			z.reset();
+			z.alive = true;
+			z.Health = 100;
+			z.body.setActive(true);
+		}
+
+		player.reset(horde);
+		player.alive = true;
+		player.health = 100;
+		deadEntities.remove(player);
+		timer = 100;
+		player.body.setActive(true);
+	}
+	public void resetGame_Player_Dead()
+	{
+
+		for (Zombie z : horde)
+		{
+			deadEntities.remove(z);
+			z.reset();
+			z.alive = true;
+			z.Health = 100;
+			z.body.setActive(true);
+		}
+
+		player.reset(horde);
+		player.alive = true;
+		player.health = 100;
+		deadEntities.remove(player);
+		timer = 100;
+		player.body.setActive(true);
 	}
 
 	@Override
 	public void render () {
 		Gdx.gl.glClearColor(0, 0, 0, 0);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
 		//Update Camera, Check input, RenderShapes and world
 		camera.update();
 		checkInput();
-		renderShapesAndWorld();
-		//Draw player and zombie whiel updating camera pos
+
+		//Draw player and zombie while updating camera pos
 		batch.setProjectionMatrix(camera.combined);
 		batch.begin();
+		Vector3 screenCorner = camera.unproject(new Vector3(0,0,0));
+		batch.draw(skyBox,screenCorner.x,screenCorner.y,worldWidth*2, worldHeight*2);
+		testMap.renderTiles(batch);
+		batch.end();
+		renderShapesAndWorld();
+		batch.begin();
+
 		if (player.alive) {
+
             player.updatePlayer(batch);
 
+            //Shoot bullets if mouse-down
+			if (mouseDown && itemSelect == 1 && !tpEngaged)
+			{
+				bulletTimer--;
+				if (bulletTimer <= 0) {
+					spawnBullets();
+					if (playerIsBuffed) {
+						bulletTimer = 5;
+					}else{
+						bulletTimer = 10;
+					}
+				}
+			}
+
+			//"Fast" effect for when player is dashing
             if (player.isDashing) {
-                updateCameraPos(2f);
+                updateCameraPos(1f);
             } else {
                 updateCameraPos(5f);
             }
 
         }else{
+
+			//Draw game over screen, then start timer for the game to restart
 		    deadEntities.add(player);
+			player.alive = false;
 		    BitmapFont gameOverText = new BitmapFont(true);
 		    gameOverText.draw(batch,"Dead X.X",worldWidth/2,worldHeight/2);
-
+		    timer--;
+		    if (timer <= 0)
+			{
+				resetGame_Player_Dead();
+			}
         }
+
+
+		//Update zombies
         for (Zombie z: horde)
         {
             if (z.alive) {
                 z.updateZombie(batch, player);
+//                if (z.isInjured)
+//				{
+//					effect.setPosition(z.x,z.y);
+//					effect.update(Gdx.graphics.getDeltaTime());
+//					effect.draw(batch, Gdx.graphics.getDeltaTime());
+//				}
             }else {
                 deadEntities.add(z);
             }
         }
+
         //Render bullet if alive, else, reset it and remove it from the array
 		//while adding it in the list of bodies to be destroyed
         for (Bullet bullet: activeBullets)
@@ -442,20 +639,77 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 				//bulletPool.free(bullet);
 			}
         }
+        int checkIfFinished = 0;
 		for (Entity e : deadEntities)
 		{
 			if (e.getType() == Constants.BULLET_TYPE) {
 				bulletPool.free((Bullet) e);
 				activeBullets.remove(e);
 			}
+			if (e.getType() == Constants.ZOMBIE_TYPE)
+			{
+				checkIfFinished++;
+			}
 			e.getBody().setActive(false);
+		}
+		if (checkIfFinished >= horde.size())
+		{
+			resetGame();
 		}
 		deadEntities.clear();
         batch.end();
+
+		//Render Structures
+		for (Structure s : worldStructures)
+		{
+			if (s.equals(boundaries))
+			{
+				continue;
+			}
+			s.renderStructure(camera,batch);
+		}
+		renderHealthBar();
 		world.step(1/120f, 6, 2);
-		debugRenderer.render(world, camera.combined);
+		System.out.println(worldWidth);
+		//debugRenderer.render(world, camera.combined);
 	}
 
+
+	public void renderHealthBar()
+	{
+		//For the health bar sprite
+		int healthBarWidth = 300;
+		int healthBarHeight = 300;
+		float x = 0;
+		float y = screenHeight - (health_bar.getRegionHeight()*2.5f);
+
+		UI_Batch.setProjectionMatrix(screenMatrix);
+		UI_Batch.begin();
+		UI_Batch.draw(depletedHealthReg,x+20,screenHeight-52,2.3f,2.4f);
+		UI_Batch.draw(healthReg,x+20,screenHeight-52,2.3f*player.health/100,2.4f*player.health/100);
+		UI_Batch.draw(health_bar,x,y,healthBarWidth,healthBarHeight);
+
+		if (Player.comboCounter > 0 && Player.comboCounter <=6) {
+			int index = Player.comboCounter-1;
+			UI_Batch.draw(comboMeter.animFrames[index], 0, 400, 200, 200);
+
+		}else if(Player.comboCounter >= 7){
+			playerIsBuffed = true;
+			UI_Batch.draw(comboMeter.animFrames[6], 0, 400, 200, 200);
+		}else{
+			playerIsBuffed = false;
+		}
+
+
+		if (itemSelect == 1) {
+			UI_Batch.draw(rifle_selected, 0, 100, 130, 130);
+			UI_Batch.draw(shotgun, 0, 200,100,100);
+		}else{
+			UI_Batch.draw(rifle, 0, 130, 100, 100);
+			UI_Batch.draw(shotgun_selected, 0, 200, 130, 130);
+		}
+		UI_Batch.end();
+	}
 	public void renderShapesAndWorld()
 	{
 		shapeRenderer.setProjectionMatrix(camera.combined);
@@ -465,15 +719,10 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		{
 			updateTpRayPos();
 		}
-		//Render my stuctues
-		for (Structure s : worldStructures)
-		{
-			for (Vector2[] polygon : s.polygonList)
-			{
-				float[] vertices = s.getPolygonVectors(polygon);
-				shapeRenderer.polygon(vertices);
-			}
-		}
+
+		Vector2 cursorPosition = player.mam.mBody.getPosition();
+		shapeRenderer.rect(cursorPosition.x,cursorPosition.y,4f,4f);
+
 		//Re-initiate my array
 		rayAngles = new float[rays.size()];
 		rayPolygon = new float[rays.size()*2];
@@ -527,7 +776,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 				rayAngles[index] = angle;
 				angleMap.put(rayAngles[index],closestIntersection);
 			}
-			shapeRenderer.line(ray.x1,ray.y1,x2,y2);
+			//shapeRenderer.line(ray.x1,ray.y1,x2,y2);
 			for (Zombie z : horde)
 			{
 				shapeRenderer.polygon(z.getPolygonVectors(z.scaledShapeVertices));
@@ -561,6 +810,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 				z.spotPlayer = false;
 			}
 		}
+
 		shapeRenderer.end();
 		//Initialize my Region, texture and batch to render the polygon.
 		if (gameLightOn) {
@@ -588,6 +838,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	}
 
 	public void createWall(World world,float x, float y, float width, float height) {
+
 		BodyDef wallDef = new BodyDef();
 		wallDef.position.set(x, y);
 		Body wallBody = world.createBody(wallDef);
@@ -595,6 +846,8 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		PolygonShape wallShape = new PolygonShape();
 		wallShape.setAsBox(width, height);
 		wallBody.createFixture(wallShape, 0.0f);
+
+		walls.add(wallBody);
 		wallShape.dispose();
 	}
 
@@ -681,17 +934,17 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	
 	
-	public void addSprites()
+	public void addSprites(HashMap<String,Sprite> map, TextureAtlas atlas)
 	{
-		Array<AtlasRegion> regions = textureAtlas.getRegions();
+		Array<AtlasRegion> regions = atlas.getRegions();
 		
 		for(AtlasRegion region : regions)
 		{
 			region.flip(false, true);
 
-			Sprite sprite = textureAtlas.createSprite(region.name);
+			Sprite sprite = atlas.createSprite(region.name);
 
-            sprites.put(region.name, sprite);
+            map.put(region.name, sprite);
 			
 		}
 		
@@ -702,6 +955,9 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 		float screenWidth = Gdx.graphics.getWidth();
 		float screenHeight = Gdx.graphics.getHeight();
+		this.screenWidth = screenWidth;
+		this.screenHeight = screenHeight;
+
 		camera.viewportWidth = worldHeight * (screenWidth/screenHeight);
 		worldWidth = camera.viewportWidth;
 		camera.viewportHeight = worldHeight;
@@ -728,36 +984,51 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		}
 		//update the current borders
 		currentBoundaries = setScreenBorders(width,height).get(0);
+		batch.setProjectionMatrix(camera.combined);
+		screenMatrix = new Matrix4(batch.getProjectionMatrix().setToOrtho2D(0,0,screenWidth,screenHeight));
+		System.out.println("World width: "+worldWidth);
+
+		placeWalls();
 
 	}
 	
 	@Override
 	public void dispose () {
 		textureAtlas.dispose();
+		mapTextures.dispose();
 		rayHandler.dispose();
 		sprites.clear();
 		debugRenderer.dispose();
 		world.dispose();
+		effect.dispose();
+//		rifleShot.dispose();
+//		shotgunBlast.dispose();
+//		bulletHit.dispose();
 	}
 
 	public void checkInput()
 	{
+		float angle = player.mam.mBody.getAngle();
 		if (!player.isDashing) {
 			if (Gdx.input.isKeyPressed(Keys.W)) {
 				player.body.setLinearVelocity(0, -150);
-				player.mam.updateMam();
+				player.mam.updateMam(angle);
+				player.idle = false;
 			}
 			if (Gdx.input.isKeyPressed(Keys.S)) {
 				player.body.setLinearVelocity(0, 150);
-				player.mam.updateMam();
+				player.mam.updateMam(angle);
+				player.idle = false;
 			}
 			if (Gdx.input.isKeyPressed(Keys.A)) {
 				player.body.setLinearVelocity(-150, 0);
-				player.mam.updateMam();
+				player.mam.updateMam(angle);
+				player.idle = false;
 			}
 			if (Gdx.input.isKeyPressed(Keys.D)) {
 				player.body.setLinearVelocity(150, 0);
-				player.mam.updateMam();
+				player.mam.updateMam(angle);
+				player.idle = false;
 			}
 			if (Gdx.input.isKeyPressed(Keys.C)) {
 				//shotgunCounter++;
@@ -790,6 +1061,9 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 		if (keycode == Keys.SPACE)
 		{
 			player.isDashing = true;
+			player.dashAnimationRotation = MathUtils.radiansToDegrees * player.mam.mBody.getAngle();
+			player.dashAnimationX = player.mam.mBody.getPosition().x;
+			player.dashAnimationY = player.mam.mBody.getPosition().y;
 		}
 		if (keycode == Keys.SHIFT_LEFT)
 		{
@@ -813,18 +1087,22 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 			if (keycode == Keys.W) {
 				player.body.setLinearVelocity(0, 0);
 				player.body.setAngularVelocity(0);
+				player.idle = true;
 			}
 			if (keycode == Keys.S) {
 				player.body.setLinearVelocity(0, 0);
 				player.body.setAngularVelocity(0);
+				player.idle = true;
 			}
 			if (keycode == Keys.A) {
 				player.body.setLinearVelocity(0, 0);
 				player.body.setAngularVelocity(0);
+				player.idle = true;
 			}
 			if (keycode == Keys.D) {
 				player.body.setLinearVelocity(0, 0);
 				player.body.setAngularVelocity(0);
+				player.idle = true;
 			}
 
 		}
@@ -836,12 +1114,14 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button){
-
-		if (!tpEngaged) {
-			if (itemSelect == 1) {
-				spawnBullets();
-			} else {
-				shotgunBaby(10);
+		mouseDown = true;
+		if (!tpEngaged && player.alive) {
+			if (itemSelect == 2) {
+				if (playerIsBuffed) {
+					shotgunBaby(15);
+				}else{
+					shotgunBaby(5);
+				}
 			}
 		}else{
 			teleportPlayer();
@@ -851,7 +1131,10 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
 	}
 
 	@Override
-	public boolean touchUp(int screenX, int screenY, int pointer, int button){return false;}
+	public boolean touchUp(int screenX, int screenY, int pointer, int button){
+		mouseDown = false;
+		return false;
+	}
 
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {return false;}
@@ -872,8 +1155,7 @@ public class ZombieMania extends ApplicationAdapter implements InputProcessor,Co
             float DE = (mouseVec.x * initialPlayerV.y) - (mouseVec.y * initialPlayerV.x);
             float angle = (float) Math.atan2(DE, DP);
 
-            player.body.setTransform(player.body.getPosition(), -angle);
-            player.mam.updateMam();
+            player.mam.updateMam(-angle);
         }
 		return false;
 	}

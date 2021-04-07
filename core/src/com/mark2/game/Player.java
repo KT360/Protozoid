@@ -8,7 +8,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
@@ -28,7 +30,8 @@ import com.badlogic.gdx.utils.Array;
 
 public class Player implements Entity {
 	
-	Sprite sprite;
+	Sprite facing_right;
+	Sprite facing_left;
 	BodyDef bodyDef;
 	Body body;
 	FixtureDef fixtureDef;
@@ -38,38 +41,63 @@ public class Player implements Entity {
 	float y = 100f;
 	float xDir = 0;
 	float yDir = 0;
-	float playerScale = Constants.SPRITE_SCALING;
-	int energy = 100;
+	float playerScale = Constants.BODY_SCALING;
+	float spriteScale = Constants.SPRITE_SCALING;
+	int energy = 80;
 	int health = 100;
 	boolean alive = true;
-
+	boolean idle = true;
+	int stepEffectCounter = 30;
+	int animationDelay = 10;
+	public static int comboCounter= 0;
+	public static int comboTimer = Constants.COMBO_TIMER;
 	boolean isDashing = false;
 	BulletPosManager mam;
 
 	Vector2 vector1;
 	Vector2 vector2;
+	Vector2 dashDir;
 	Vector2[] originalShapeVertices;
 	Vector2[] scaledShapeVertices;
 
 	ArrayList<Vector2> shotGunVectors = new ArrayList<>();
+	Animator player_facing_right;
+	Animator player_facing_left;
+	Animator stepEffect;
+	Texture stepEffectFrames;
+	Texture frames;
+	Texture left_frames;
+
+	float stepX;
+	float stepY;
+
+	Animator dashAnimation;
+	Texture dashFrames;
+	float dashAnimationRotation;
+	float dashAnimationX;
+	float dashAnimationY;
 
 	public Player(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader,ArrayList<Zombie> horde)
 	{
-		r = new Random();
-		if(horde != null) {
-			for (Zombie z : horde) {
-				Vector2 v = new Vector2(z.x - x, z.y - y);
-				float distance = getLengthOf(v.x, v.y);
-				if (distance < 85) {
-					x = r.nextInt(190) + 10;
-					y = r.nextInt(190) + 10;
-				}
-			}
-		}
-		sprite = sprites.get("Player");;
-		sprite.setScale(playerScale);
-		sprite.setOriginCenter();
-		sprite.setOriginBasedPosition(x,y);
+		reset(horde);
+
+		frames = new Texture(Gdx.files.internal("Animations/Walk cycle.png"));
+		stepEffectFrames = new Texture(Gdx.files.internal("Animations/Dash.png"));
+		left_frames = new Texture(Gdx.files.internal(("Animations/Walk_Cycle_Left.png")));
+		dashFrames = new Texture(Gdx.files.internal("Animations/Dash_Route.png"));
+
+		stepX = x;
+		stepY = y;
+
+		facing_right = sprites.get("Player");;
+		facing_right.setScale(spriteScale);
+		facing_right.setOriginCenter();
+		facing_right.setOriginBasedPosition(x,y);
+
+		facing_left = sprites.get("Player_Left");
+		facing_left.setScale(spriteScale);
+		facing_left.setOriginCenter();
+		facing_left.setOriginBasedPosition(x,y);
 
 		bodyDef = new BodyDef();
 		bodyDef.type = BodyDef.BodyType.DynamicBody;
@@ -81,10 +109,12 @@ public class Player implements Entity {
 		fixtureDef.density = 0.5f; 
 		fixtureDef.friction = 0.4f;
 		fixtureDef.restitution = 0.4f;
-		fixtureDef.filter.categoryBits = ZombieMania.xPLAYER;
+
 		//fixtureDef.filter.maskBits = ZombieMania.PLAYER_MASK;
 		
-		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX()*Constants.PPM,this);
+		loader.attachFixture(body, "Player",fixtureDef, playerScale,this);
+
+		System.out.println("Player scale: "+playerScale * Constants.PPM);
 
 		originalShapeVertices = loader.shapeVertices;
 		scaledShapeVertices = new Vector2[originalShapeVertices.length];
@@ -92,7 +122,12 @@ public class Player implements Entity {
 		mam = new BulletPosManager(world);
 
 		initVectors();
-		
+
+		player_facing_right = new Animator(frames,3,4,1/40f,true);
+		player_facing_left = new Animator(left_frames,3,4,1/40f,true);
+		stepEffect = new Animator(stepEffectFrames,2,3,1/8f,true);
+		dashAnimation = new Animator(dashFrames,2,2,1/12f,true);
+		dashDir = mam.currentDir;
 	}
 
 	public void initVectors()
@@ -123,23 +158,63 @@ public class Player implements Entity {
 
 	public void updatePlayer(SpriteBatch batch)
 	{
-
+		if (comboCounter > 0) {
+			comboTimer--;
+			if (comboTimer <= 0) {
+				comboCounter = 0;
+				comboTimer = Constants.COMBO_TIMER;
+			}
+		}
 		if (isDashing)
 		{
-			Dash();
+			Dash(batch);
+		}
+		else{
+			dashDir = mam.currentDir;
 		}
 		Vector2 position = body.getPosition();
+		body.setTransform(position,0);
 		this.x = position.x;
 		this.y = position.y;
-		sprite.setOriginBasedPosition(x, y);
-		sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
-		for (int i =0; i<scaledShapeVertices.length; i++)
-		{
-			Vector2 originalVertex = originalShapeVertices[i];
-			Vector2 updatedVertex = new Vector2(originalVertex.x + body.getPosition().x, originalVertex.y + body.getPosition().y);
-			scaledShapeVertices[i] = updatedVertex;
+
+		if (idle) {
+			if (mam.mBody.getAngle() < 1) {
+				facing_right.setOriginBasedPosition(x, y);
+				facing_right.setRotation(MathUtils.radiansToDegrees * body.getAngle());
+				facing_right.draw(batch);
+			}else{
+				facing_left.setOriginBasedPosition(x, y);
+				facing_left.setRotation(MathUtils.radiansToDegrees * body.getAngle());
+				facing_left.draw(batch);
+			}
+
+		}else {
+			if (mam.mBody.getAngle() < 1) {
+				player_facing_right.renderAnimation(batch, this, playerScale, playerScale);
+			}else{
+				player_facing_left.renderAnimation(batch,this,playerScale,playerScale);
+			}
+			stepEffectCounter--;
+			if (stepEffectCounter <= 0)
+			{
+				stepEffect.renderAnimation(batch,stepX,stepY+playerScale/3,playerScale-1,playerScale-1);
+				animationDelay--;
+				if (animationDelay <= 0) {
+					animationDelay = 10;
+					stepEffectCounter = 30;
+				}
+			}else {
+				stepX = x;
+				stepY = y;
+			}
 		}
-		sprite.draw(batch);
+//		for (int i =0; i<scaledShapeVertices.length; i++)
+//		{
+//			Vector2 originalVertex = originalShapeVertices[i];
+//			Vector2 updatedVertex = new Vector2(originalVertex.x + body.getPosition().x, originalVertex.y + body.getPosition().y);
+//			scaledShapeVertices[i] = updatedVertex;
+//		}
+
 		
 	}
 
@@ -175,23 +250,41 @@ public class Player implements Entity {
 
 	}
 
-	public void Dash()
+	public void Dash(SpriteBatch batch)
 	{
 		if(energy > 0)
 		{
-			Vector2 dashDir = new Vector2(mam.currentDir.x *20,mam.currentDir.y *20);
-			body.applyLinearImpulse(dashDir.x *155, dashDir.y *155,x,y,true);
+			body.setLinearVelocity(dashDir.x *300, dashDir.y *300);
+			dashAnimation.renderAnimation(batch,dashAnimationX,dashAnimationY,40,70,1,1,dashAnimationRotation);
 			energy-=2;
 			if (energy <= 0)
 			{
 				body.setLinearVelocity(0,0);
 				body.setAngularVelocity(0);
-				energy = 100;
+				energy = 80;
 				isDashing = false;
 			}
 		}
 
 
+	}
+
+	public void reset(ArrayList<Zombie> horde)
+	{
+		r = new Random();
+		if(horde != null) {
+			for (Zombie z : horde) {
+				Vector2 v = new Vector2(z.x - x, z.y - y);
+				float distance = getLengthOf(v.x, v.y);
+				if (distance < 85) {
+					x = r.nextInt(200) + 10;
+					y = r.nextInt(200) + 10;
+					if (body != null) {
+						body.setTransform(x, y, body.getAngle());
+					}
+				}
+			}
+		}
 	}
 
 	@Override
@@ -218,6 +311,12 @@ public class Player implements Entity {
 	public Body getBody() {
 		return this.body;
 	}
+
+	@Override
+	public Vector2 getPosition() {
+		return getPos();
+	}
+
 	public float getLengthOf(float vectorX, float vectorY)
 	{
 		float length = (float) Math.sqrt(Math.pow(vectorX,2)+Math.pow(vectorY,2));
@@ -237,7 +336,7 @@ public class Player implements Entity {
 		Vector2 currentDir;
 		Vector2 initialVector;
 		Vector2 spriteRelativeVector;
-		float offset = 7;
+		float offset = 15;
 		float length;
 
 		public BulletPosManager(World world)
@@ -268,7 +367,8 @@ public class Player implements Entity {
 
 			PolygonShape manager = new PolygonShape();
 			manager.setAsBox(2f, 2f);
-			
+
+
 			fDef = new FixtureDef();
 			fDef.shape = manager;
 			fDef.isSensor = true;
@@ -283,12 +383,12 @@ public class Player implements Entity {
 		}
 
 
-		public void updateMam() {
+		public void updateMam(float angle) {
 
 			Vector2 bodyPosition = body.getPosition();
 
-			float iniX = initialVector.x * (float) Math.cos(body.getAngle()) - initialVector.y * (float) Math.sin(body.getAngle());
-			float iniY = initialVector.x * (float) Math.sin(body.getAngle()) + initialVector.y * (float) Math.cos(body.getAngle());
+			float iniX = initialVector.x * (float) Math.cos(angle) - initialVector.y * (float) Math.sin(angle);
+			float iniY = initialVector.x * (float) Math.sin(angle) + initialVector.y * (float) Math.cos(angle);
 
 			//Vector for the bullet sprites
 			spriteRelativeVector = new Vector2(iniX+x,iniY+y);
@@ -304,7 +404,7 @@ public class Player implements Entity {
 			float newX = iniX + bodyPosition.x;
 			float newY = iniY + bodyPosition.y;
 			Vector2 newVec = new Vector2(newX,newY);
-			mBody.setTransform(newVec,body.getAngle());
+			mBody.setTransform(newVec,angle);
 
 
 
@@ -314,16 +414,16 @@ public class Player implements Entity {
 			Vector2 v1 = vector1;
 			Vector2 v2 = vector2;
 
-			float vX = v1.x * (float) Math.cos(body.getAngle()) - v1.y * (float) Math.sin(body.getAngle());
-			float vY = v1.x * (float) Math.sin(body.getAngle()) + v1.y * (float) Math.cos(body.getAngle());
+			float vX = v1.x * (float) Math.cos(angle) - v1.y * (float) Math.sin(angle);
+			float vY = v1.x * (float) Math.sin(angle) + v1.y * (float) Math.cos(angle);
 
 			Vector2 newV1 = new Vector2(vX,vY);
 
 			shotGunVectors.remove(0);
 			shotGunVectors.add(0,newV1);
 
-			float v2X = v2.x * (float) Math.cos(body.getAngle()) - v2.y * (float) Math.sin(body.getAngle());
-			float v2Y = v2.x * (float) Math.sin(body.getAngle()) + v2.y * (float) Math.cos(body.getAngle());
+			float v2X = v2.x * (float) Math.cos(angle) - v2.y * (float) Math.sin(angle);
+			float v2Y = v2.x * (float) Math.sin(angle) + v2.y * (float) Math.cos(angle);
 
 			Vector2 newV2 = new Vector2(v2X,v2Y);
 

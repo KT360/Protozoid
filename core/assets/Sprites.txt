@@ -1,33 +1,33 @@
 Sprites.png
-size: 1372, 264
+size: 128, 32
 format: RGBA8888
-filter: Linear,Linear
+filter: Nearest,Nearest
 repeat: none
 Bullet
   rotate: false
   xy: 0, 0
-  size: 296, 264
-  orig: 296, 264
+  size: 32, 32
+  orig: 32, 32
   offset: 0, 0
   index: -1
-Bullet_Particle
+Enemy
   rotate: false
-  xy: 296, 0
-  size: 484, 264
-  orig: 484, 264
+  xy: 32, 0
+  size: 32, 32
+  orig: 32, 32
   offset: 0, 0
   index: -1
 Player
   rotate: false
-  xy: 780, 0
-  size: 296, 264
-  orig: 296, 264
+  xy: 64, 0
+  size: 32, 32
+  orig: 32, 32
   offset: 0, 0
   index: -1
-Zombie
+Player_Left
   rotate: false
-  xy: 1076, 0
-  size: 296, 264
-  orig: 296, 264
+  xy: 96, 0
+  size: 32, 32
+  orig: 32, 32
   offset: 0, 0
   index: -1

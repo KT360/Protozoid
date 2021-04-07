@@ -6,8 +6,11 @@ import java.awt.Rectangle;
 import java.util.HashMap;
 import java.util.Random;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
@@ -20,8 +23,8 @@ public class Zombie implements Entity{
 
 	Random r = new Random();
 	
-	float x = r.nextInt(200);
-	float y = r.nextInt(200);
+	float x = r.nextInt(230);
+	float y = r.nextInt(230);
 	
 	//Added directions
 	float xDir = 0;
@@ -29,8 +32,16 @@ public class Zombie implements Entity{
 	
 	public boolean alive = true;
 	public int Health = 100;
+	int bloodSpillTimer = 50;
 	boolean alert = false;
 	boolean spotPlayer = false;
+	boolean isInjured = false;
+	boolean idle = true;
+	int animationDelay = 20;
+	int collisionTimer = 50;
+	boolean collided = false;
+
+	Bullet bullet;
 
 	Sprite sprite;
 	BodyDef bodyDef;
@@ -39,10 +50,20 @@ public class Zombie implements Entity{
 	Vector2[] originalShapeVertices;
 	Vector2[] scaledShapeVertices;
 	Vector2 dashDir;
-	
+	Animator animation;
+	Animator explosion;
+	Animator bulletHit;
+	Texture frames;
+	Texture explosionFrames;
+	Texture splatterFrames;
+
 	public Zombie(HashMap<String, Sprite> sprites, World world, BodyEditorLoader loader, Player player) {
 
-		sprite = sprites.get("Zombie");
+		frames = new Texture(Gdx.files.internal("Animations/Enemy_Slime_Walk.png"));
+		explosionFrames = new Texture(Gdx.files.internal("Animations/Explosion.png"));
+		splatterFrames = new Texture(Gdx.files.internal("Animations/Bullet_Hit.png"));
+
+		sprite = sprites.get("Enemy");
 		sprite.setOriginBasedPosition(x,y);
 		sprite.setOriginCenter();
 		sprite.setScale(Constants.SPRITE_SCALING);
@@ -56,30 +77,68 @@ public class Zombie implements Entity{
 		fixtureDef = new FixtureDef();
 		fixtureDef.density = 0.1f;
 		fixtureDef.friction = 0.4f;
-		fixtureDef.restitution = 0.1f;
-		fixtureDef.filter.categoryBits = ZombieMania.xZOMBIE;
+		fixtureDef.restitution = 1f;
 		//fixtureDef.filter.maskBits = ZombieMania.ZOMBIE_MASK;
 		
 		
-		loader.attachFixture(body, "Player",fixtureDef, sprite.getScaleX() * Constants.PPM,this);
+		loader.attachFixture(body, "Player",fixtureDef, Constants.BODY_SCALING,this);
 		originalShapeVertices = loader.shapeVertices;
 		scaledShapeVertices = new Vector2[originalShapeVertices.length];
 		updatePolygonVertices();
 		dashDir = new Vector2(0, 0);
+
+		animation = new Animator(frames,3,4,1/8f,true);
+		explosion = new Animator(explosionFrames,2,3,1/24f,true);
+		bulletHit = new Animator(splatterFrames,3,3,1/24f,true);
 	}
 
 	public void updateZombie(SpriteBatch batch, Player player) {
-		if (spotPlayer && player.alive)
+		if (spotPlayer && player.alive && !collided)
 		{
 			chase(player);
+			idle = false;
+		}else if (collided){
+			Vector2 impulse = new Vector2(dashDir.x*-50,dashDir.y*-50);
+			body.applyLinearImpulse(impulse,body.getPosition(), true);
+			collisionTimer--;
+			if (collisionTimer <= 0)
+			{
+				collided = false;
+				collisionTimer = 50;
+			}
+		}
+		else {
+			idle = true;
 		}
 		Vector2 position = body.getPosition();
 		this.x = position.x;
 		this.y = position.y;
-		sprite.setOriginBasedPosition(x,y);
-		sprite.setRotation(MathUtils.radiansToDegrees * body.getAngle());
-		updatePolygonVertices();
-		sprite.draw(batch);
+		if (idle) {
+			sprite.setOriginBasedPosition(x, y);
+			updatePolygonVertices();
+			sprite.draw(batch);
+		}else{
+			animation.renderAnimation(batch,this,18,18);
+		}
+		if (isInjured)
+		{
+			explosion.renderAnimation(batch,this,15,15);
+			if (bullet != null) {
+				float rotation = bullet.getAngle();
+				bulletHit.renderAnimation(batch,bullet,40,40,0.8f,0.8f,rotation);
+			}
+			if (explosion.animation.isAnimationFinished(explosion.getStateTime()))
+			{
+				animationDelay--;
+				if (animationDelay <=0) {
+					animationDelay = 20;
+					isInjured = false;
+					if (bullet!= null) {
+						bullet.alive = false;
+					}
+				}
+			}
+		}
 	}
 	public void updatePolygonVertices()
 	{
@@ -117,13 +176,13 @@ public class Zombie implements Entity{
 		checkRange(player);
 
 		if (alert) {
-			xDir = dashDir.x*10;
-			yDir = dashDir.y*10;
+			xDir = dashDir.x;//*10;
+			yDir = dashDir.y;//*10;
 		}else {
 
 			dashDir = chaseDir;
-			xDir = chaseDir.x*5;
-			yDir = chaseDir.y*5;
+			xDir = chaseDir.x;//*5;
+			yDir = chaseDir.y;//*5;
 		}
 		move();
 
@@ -131,12 +190,13 @@ public class Zombie implements Entity{
 
 	public void checkRange(Player player)
 	{
-		float attackRange = 80;
+		float attackRange = 55;
 		float currentRange = (float) Math.sqrt(Math.pow((player.getPos().x - x),2)+Math.pow((player.getPos().y - y),2));
 
 		if (currentRange < attackRange)
 		{
 			alert = true;
+
 		}
 		else
 		{
@@ -144,6 +204,13 @@ public class Zombie implements Entity{
 		}
 	}
 
+	public void reset()
+	{
+		x = r.nextInt(200);
+		y = r.nextInt(200);
+		body.setTransform(x,y,body.getAngle());
+		alive = true;
+	}
 	public void move()
 	{
 		body.setLinearVelocity(xDir*50,yDir*50);
@@ -192,7 +259,7 @@ public class Zombie implements Entity{
 	public void setPos(int x, int y)
 	{
 		this.x = x;
-		this.y = x;
+		this.y = y;
 		
 		
 	}
@@ -205,9 +272,13 @@ public class Zombie implements Entity{
 				case Constants.BULLET_TYPE:
 					if (Health > 0)
 					{
-						Health-=10;
+						Health-=17;
+						bullet = (Bullet) otherEntity;
+						isInjured = true;
 					}else{
 						alive = false;
+						Player.comboCounter++;
+						Player.comboTimer  = Constants.COMBO_TIMER;
 					}
 					break;
 				case Constants.PLAYER_TYPE:
@@ -218,6 +289,9 @@ public class Zombie implements Entity{
 						player.alive = false;
 					}
 					System.out.println("!!!");
+					break;
+				case Constants.ZOMBIE_TYPE:
+					collided = true;
 					break;
 			}
 		}
@@ -231,6 +305,11 @@ public class Zombie implements Entity{
 	@Override
 	public Body getBody() {
 		return this.body;
+	}
+
+	@Override
+	public Vector2 getPosition() {
+		return new Vector2(x,y);
 	}
 
 }

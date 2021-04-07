@@ -44,7 +44,7 @@ public class Bullet implements Poolable, Entity {
 		sprite = sprites.get("Bullet");
 		sprite.setOriginBasedPosition(x,y);
 		sprite.setOriginCenter();
-		sprite.setScale(player.sprite.getScaleX());
+		sprite.setScale(0.8f);
 
 
 		bodyDef = new BodyDef();
@@ -58,7 +58,6 @@ public class Bullet implements Poolable, Entity {
 		fixtureDef.density = 1.01f;
 		fixtureDef.friction = 0.01f;
 		fixtureDef.restitution = 0.5f;
-		fixtureDef.filter.categoryBits = ZombieMania.xBULLET;
 		//fixtureDef.filter.maskBits = ZombieMania.BULLET_MASK;
 
 		loader.attachFixture(body, "Bullet", fixtureDef, sprite.getScaleX() * Constants.PPM,this);
@@ -92,6 +91,7 @@ public class Bullet implements Poolable, Entity {
 		setDir(direction.x,direction.y);
 		this.Angle = angle;
 		this.aliveTime = aliveTime;
+		sprite.setRotation(MathUtils.radiansToDegrees * angle);
 		body.setActive(true);
 	}
 	
@@ -111,7 +111,7 @@ public class Bullet implements Poolable, Entity {
 	{
 		this.xDir = x;
 		this.yDir = y;
-		body.setLinearVelocity(xDir*200,yDir*200);
+		body.setLinearVelocity(xDir*400,yDir*400);
 	}
 
 	//For vectors
@@ -119,7 +119,7 @@ public class Bullet implements Poolable, Entity {
 	{
 		this.xDir =  direction.x;
 		this.yDir =  direction.y;
-		body.setLinearVelocity(xDir*200,yDir*200);
+		body.setLinearVelocity(xDir*400,yDir*400);
 	}
 
 	public float getAngle()
@@ -169,7 +169,25 @@ public class Bullet implements Poolable, Entity {
 	public void checkCollision(Entity otherEntity) {
 		if (otherEntity != null)
 		{
-
+			switch (otherEntity.getType())
+			{
+				case Constants.STRUCTURE_TYPE:
+					Structure structure = (Structure) otherEntity;
+					structure.isHit = true;
+					break;
+				case Constants.ZOMBIE_TYPE:
+					Zombie zombie =  (Zombie) otherEntity;
+					zombie.isInjured = true;
+					if (zombie.Health > 0){
+						zombie.Health -= 17;
+					}else {
+						zombie.alive = false;
+						Player.comboCounter++;
+						Player.comboTimer = Constants.COMBO_TIMER;
+						//ZombieMania.progressNumb++;
+					}
+					break;
+			}
 		}
 	}
 
@@ -181,6 +199,11 @@ public class Bullet implements Poolable, Entity {
 	@Override
 	public Body getBody() {
 		return this.body;
+	}
+
+	@Override
+	public Vector2 getPosition() {
+		return new Vector2(x,y);
 	}
 
 }
