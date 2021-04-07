@@ -9,9 +9,15 @@ DEMO:V1.0
 
 
 
+
+
+V2.0
+
+[![Demo CountPages alpha](https://j.gifs.com/K1K6zY.gif)](https://www.youtube.com/watch?v=xK1EudHvVPg&ab_channel=kamtoastrid)
+
 **#Premise**:
 
--Careful not to get spotted by the horde of zombies!
+-Careful not to get spotted by the horde of "zombies"!
 
 -Use **(SHIFT)** to switch from your regular pistol to a wider spread shot-gun!
 
